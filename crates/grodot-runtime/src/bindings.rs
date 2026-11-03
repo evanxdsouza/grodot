@@ -130,11 +130,7 @@ impl EntityHandle {
             let mut current = if path.starts_with('/') {
                 let first = parts.next()?;
                 let root_name = if first == "root" { parts.next()? } else { first };
-                w.scene
-                    .entities
-                    .iter()
-                    .find(|e| e.parent.is_none() && e.name.as_str() == root_name)
-                    .map(|e| e.id)?
+                w.scene.entities.iter().find(|e| e.parent.is_none() && e.name.as_str() == root_name).map(|e| e.id)?
             } else {
                 self.id
             };
@@ -142,9 +138,11 @@ impl EntityHandle {
                 current = match part {
                     "." => current,
                     ".." => w.scene.entity(current)?.parent?,
-                    name => w.scene.children(current).into_iter().find(|child| {
-                        w.scene.entity(*child).map(|e| e.name.as_str() == name).unwrap_or(false)
-                    })?,
+                    name => w
+                        .scene
+                        .children(current)
+                        .into_iter()
+                        .find(|child| w.scene.entity(*child).map(|e| e.name.as_str() == name).unwrap_or(false))?,
                 };
             }
             Some(current)
@@ -393,9 +391,7 @@ impl HostObject for EntityHandle {
             "get_groups" => (|| {
                 argc(0)?;
                 self.with(|w| {
-                    Value::array(
-                        w.scene.entity(self.id).unwrap().groups.iter().map(|g| Value::str(g)).collect(),
-                    )
+                    Value::array(w.scene.entity(self.id).unwrap().groups.iter().map(|g| Value::str(g)).collect())
                 })
             })(),
             "has_component?" => (|| {
@@ -918,13 +914,8 @@ pub fn install(interp: &mut Interpreter, world: &WorldRef, timers: &Rc<RefCell<T
         scene.native("get_nodes_in_group", 1, Some(1), move |_, a| {
             let group = str_arg(a, 0, "Scene.get_nodes_in_group")?;
             let wb = w.borrow();
-            let ids: Vec<EntityId> = wb
-                .scene
-                .entities
-                .iter()
-                .filter(|e| e.is_in_group(&group) && wb.is_alive(e.id))
-                .map(|e| e.id)
-                .collect();
+            let ids: Vec<EntityId> =
+                wb.scene.entities.iter().filter(|e| e.is_in_group(&group) && wb.is_alive(e.id)).map(|e| e.id).collect();
             drop(wb);
             Ok(Value::array(ids.into_iter().map(|id| entity_value(&w, id)).collect()))
         });

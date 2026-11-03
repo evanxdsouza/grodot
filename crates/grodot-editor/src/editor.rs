@@ -1426,9 +1426,8 @@ impl Editor {
             Popup::None => {}
             Popup::AddEntity => {
                 let items: Vec<String> = [
-                    "Empty", "Cube", "Sphere", "Plane",
-                    "Cylinder", "Capsule", "Camera", "Light",
-                    "Sprite2D", "Camera2D",
+                    "Empty", "Cube", "Sphere", "Plane", "Cylinder", "Capsule", "Camera", "Light", "Sprite2D",
+                    "Camera2D",
                 ]
                     .iter()
                     .map(|s| s.to_string())

@@ -89,8 +89,7 @@ impl SceneRenderer {
             return Some(view_from_matrix(&world, cam.fov, cam.near, cam.far, viewport));
         }
         let cam_ent = scene.entities.iter().find(|e| {
-            matches!(e.get("Camera2D"), Some(Component::Camera2D(c)) if c.active)
-                && scene.is_active_in_hierarchy(e.id)
+            matches!(e.get("Camera2D"), Some(Component::Camera2D(c)) if c.active) && scene.is_active_in_hierarchy(e.id)
         })?;
         // The 2D pass projects directly onto the canvas. This view only keeps
         // the existing 3D/editor overlays usable in mixed scenes.
@@ -373,10 +372,7 @@ fn pick_sprite_2d(scene: &Scene, viewport: Rect, px: f32, py: f32) -> Option<Ent
         })
         .collect();
     sprites.sort_by_key(|(z, order, _, _)| (*z, *order));
-    sprites
-        .into_iter()
-        .rev()
-        .find_map(|(_, _, id, points)| point_in_polygon(px, py, &points).then_some(id))
+    sprites.into_iter().rev().find_map(|(_, _, id, points)| point_in_polygon(px, py, &points).then_some(id))
 }
 
 fn point_in_polygon(x: f32, y: f32, points: &[(f32, f32)]) -> bool {
