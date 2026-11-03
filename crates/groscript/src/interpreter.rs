@@ -176,9 +176,8 @@ impl Interpreter {
 
     /// Load and run a file from disk.
     pub fn run_file(&mut self, path: &Path) -> GroResult<Value> {
-        let src = std::fs::read_to_string(path).map_err(|e| {
-            GroError::new(ErrorKind::Import, format!("cannot read '{}': {}", path.display(), e))
-        })?;
+        let src = std::fs::read_to_string(path)
+            .map_err(|e| GroError::new(ErrorKind::Import, format!("cannot read '{}': {}", path.display(), e)))?;
         if self.import_root.is_none() {
             self.import_root = path.parent().map(|p| p.to_path_buf());
         }
@@ -255,24 +254,16 @@ impl Interpreter {
 
     /// Call a method on an object if it exists. Returns `Ok(None)` when the method
     /// is not defined (used for optional lifecycle callbacks).
-    pub fn call_method_if_exists(
-        &mut self,
-        recv: &Value,
-        name: &str,
-        args: Vec<Value>,
-    ) -> GroResult<Option<Value>> {
+    pub fn call_method_if_exists(&mut self, recv: &Value, name: &str, args: Vec<Value>) -> GroResult<Option<Value>> {
         let method = match recv {
             Value::Object(o) => o.class.find_method(name),
             _ => None,
         };
         match method {
-            Some(m) => self
-                .call_function(&m, recv.clone(), args, Span::default())
-                .map(Some)
-                .map_err(|c| match c {
-                    Ctrl::Error(e) => e,
-                    _ => GroError::new(ErrorKind::Runtime, "unexpected control flow"),
-                }),
+            Some(m) => self.call_function(&m, recv.clone(), args, Span::default()).map(Some).map_err(|c| match c {
+                Ctrl::Error(e) => e,
+                _ => GroError::new(ErrorKind::Runtime, "unexpected control flow"),
+            }),
             None => Ok(None),
         }
     }
@@ -307,12 +298,9 @@ impl Interpreter {
     fn tick(&mut self, span: Span) -> EResult<()> {
         self.steps += 1;
         if self.steps > self.step_limit {
-            return Err(GroError::new(
-                ErrorKind::Runtime,
-                "execution budget exceeded (is there an infinite loop?)",
-            )
-            .at(span)
-            .into());
+            return Err(GroError::new(ErrorKind::Runtime, "execution budget exceeded (is there an infinite loop?)")
+                .at(span)
+                .into());
         }
         Ok(())
     }
@@ -425,13 +413,7 @@ impl Interpreter {
         Ok(())
     }
 
-    fn declare_class(
-        &mut self,
-        name: &Rc<str>,
-        parent: &Option<Rc<str>>,
-        body: &[Stmt],
-        span: Span,
-    ) -> EResult<()> {
+    fn declare_class(&mut self, name: &Rc<str>, parent: &Option<Rc<str>>, body: &[Stmt], span: Span) -> EResult<()> {
         let parent_class = match parent {
             None => None,
             Some(p) => match self.globals.get(p) {
@@ -536,31 +518,24 @@ impl Interpreter {
                 .at(span)
         })?;
         if self.loading.contains(&canon) {
-            let mut chain: Vec<String> = self
-                .loading
-                .iter()
-                .map(|p| p.file_name().unwrap_or_default().to_string_lossy().to_string())
-                .collect();
+            let mut chain: Vec<String> =
+                self.loading.iter().map(|p| p.file_name().unwrap_or_default().to_string_lossy().to_string()).collect();
             chain.push(canon.file_name().unwrap_or_default().to_string_lossy().to_string());
-            return Err(GroError::new(
-                ErrorKind::Import,
-                format!("circular import: {}", chain.join(" -> ")),
-            )
-            .at(span)
-            .into());
+            return Err(GroError::new(ErrorKind::Import, format!("circular import: {}", chain.join(" -> ")))
+                .at(span)
+                .into());
         }
         if self.loaded.contains(&canon) {
             return Ok(());
         }
-        let src = std::fs::read_to_string(&canon).map_err(|e| {
-            GroError::new(ErrorKind::Import, format!("cannot read module '{}': {}", path, e)).at(span)
-        })?;
+        let src = std::fs::read_to_string(&canon)
+            .map_err(|e| GroError::new(ErrorKind::Import, format!("cannot read module '{}': {}", path, e)).at(span))?;
         self.loading.push(canon.clone());
         let display = rel.display().to_string();
         let r = self.run_source(&display, &src);
         self.loading.pop();
         self.loaded.insert(canon);
-        r.map(|_| ()).map_err(|e| Ctrl::Error(e))
+        r.map(|_| ()).map_err(Ctrl::Error)
     }
 
     // ------------------------------------------------------------ expressions
@@ -738,11 +713,8 @@ impl Interpreter {
         if let Some(v) = self.globals.get(name) {
             return Ok(v.clone());
         }
-        let mut msg = if is_const {
-            format!("undefined constant '{}'", name)
-        } else {
-            format!("undefined variable '{}'", name)
-        };
+        let mut msg =
+            if is_const { format!("undefined constant '{}'", name) } else { format!("undefined variable '{}'", name) };
         let self_val = self.frame().self_val.clone();
         if let Value::Object(o) = &self_val {
             if o.class.find_method(name).is_some() {
@@ -759,10 +731,7 @@ impl Interpreter {
     fn get_ivar(&mut self, name: &Rc<str>) -> EResult<Value> {
         match &self.frame().self_val {
             Value::Object(o) => Ok(o.fields.borrow().get(name).cloned().unwrap_or(Value::Nil)),
-            _ => rt(
-                ErrorKind::Name,
-                format!("@{} can only be used inside a class method", name),
-            ),
+            _ => rt(ErrorKind::Name, format!("@{} can only be used inside a class method", name)),
         }
     }
 
@@ -796,11 +765,7 @@ impl Interpreter {
                     self.globals.insert(name.clone(), v.clone());
                     return Ok(v);
                 }
-                let old = if op.is_some() {
-                    Some(self.lookup(name)?)
-                } else {
-                    None
-                };
+                let old = if op.is_some() { Some(self.lookup(name)?) } else { None };
                 let v = compute(self, old)?;
                 self.frame_mut().locals.insert(name.clone(), v.clone());
                 Ok(v)
@@ -808,12 +773,7 @@ impl Interpreter {
             ExprKind::IVar(name) => {
                 let obj = match &self.frame().self_val {
                     Value::Object(o) => o.clone(),
-                    _ => {
-                        return rt(
-                            ErrorKind::Name,
-                            format!("@{} can only be used inside a class method", name),
-                        )
-                    }
+                    _ => return rt(ErrorKind::Name, format!("@{} can only be used inside a class method", name)),
                 };
                 let old = if op.is_some() {
                     Some(obj.fields.borrow().get(name).cloned().unwrap_or(Value::Nil))
@@ -825,22 +785,14 @@ impl Interpreter {
                 Ok(v)
             }
             ExprKind::GVar(name) => {
-                let old = if op.is_some() {
-                    Some(self.gvars.get(name).cloned().unwrap_or(Value::Nil))
-                } else {
-                    None
-                };
+                let old = if op.is_some() { Some(self.gvars.get(name).cloned().unwrap_or(Value::Nil)) } else { None };
                 let v = compute(self, old)?;
                 self.gvars.insert(name.clone(), v.clone());
                 Ok(v)
             }
             ExprKind::Member(obj, name) => {
                 let o = self.eval(obj)?;
-                let old = if op.is_some() {
-                    Some(self.get_member(&o, name)?)
-                } else {
-                    None
-                };
+                let old = if op.is_some() { Some(self.get_member(&o, name)?) } else { None };
                 let v = compute(self, old)?;
                 self.set_member(&o, name, v.clone())?;
                 Ok(v)
@@ -848,11 +800,8 @@ impl Interpreter {
             ExprKind::Index(obj, idx) => {
                 let o = self.eval(obj)?;
                 let i = self.eval(idx)?;
-                let old = if op.is_some() {
-                    Some(crate::builtins::index_get(&o, &i).map_err(Ctrl::Error)?)
-                } else {
-                    None
-                };
+                let old =
+                    if op.is_some() { Some(crate::builtins::index_get(&o, &i).map_err(Ctrl::Error)?) } else { None };
                 let v = compute(self, old)?;
                 crate::builtins::index_set(&o, &i, v.clone()).map_err(Ctrl::Error)?;
                 Ok(v)
@@ -865,10 +814,7 @@ impl Interpreter {
         match o {
             Value::Module(m) => match m.get(name) {
                 Some(v) => Ok(v),
-                None => rt(
-                    ErrorKind::Property,
-                    format!("module {} has no member '{}'", m.name, name),
-                ),
+                None => rt(ErrorKind::Property, format!("module {} has no member '{}'", m.name, name)),
             },
             Value::Class(c) => match c.find_constant(name) {
                 Some(v) => Ok(v),
@@ -905,10 +851,7 @@ impl Interpreter {
                         return Ok(v.clone());
                     }
                     if obj.class.find_method(name).is_some() {
-                        return rt(
-                            ErrorKind::Property,
-                            format!("'{}' is a method; call it with {}()", name, name),
-                        );
+                        return rt(ErrorKind::Property, format!("'{}' is a method; call it with {}()", name, name));
                     }
                 }
                 rt(ErrorKind::Property, format!("unknown property '{}' on {}", name, h.type_name()))
@@ -947,10 +890,7 @@ impl Interpreter {
                 ),
             ),
             Value::Module(m) => rt(ErrorKind::Property, format!("cannot assign to module member {}.{}", m.name, name)),
-            Value::Hash(_) => rt(
-                ErrorKind::Property,
-                format!("use h[:{}] = value to set a hash entry", name),
-            ),
+            Value::Hash(_) => rt(ErrorKind::Property, format!("use h[:{}] = value to set a hash entry", name)),
             other => rt(ErrorKind::Property, format!("cannot set property '{}' on a {}", name, other.type_name())),
         }
     }
@@ -961,10 +901,7 @@ impl Interpreter {
             if v.is_callable() {
                 return self.call_callable(&v, args, span);
             }
-            return rt(
-                ErrorKind::Type,
-                format!("'{}' is a {}, not a function", name, v.type_name()),
-            );
+            return rt(ErrorKind::Type, format!("'{}' is a {}, not a function", name, v.type_name()));
         }
         // 2. method on self
         let self_val = self.frame().self_val.clone();
@@ -979,22 +916,11 @@ impl Interpreter {
             }
         }
         // 3. module member, 4. global
-        let f = self
-            .frame()
-            .module
-            .as_ref()
-            .and_then(|m| m.get(name))
-            .or_else(|| self.globals.get(name).cloned());
+        let f = self.frame().module.as_ref().and_then(|m| m.get(name)).or_else(|| self.globals.get(name).cloned());
         match f {
             Some(f @ (Value::Function(_) | Value::Native(_))) => self.call_callable(&f, args, span),
-            Some(Value::Class(c)) => rt(
-                ErrorKind::Type,
-                format!("to create a {} write {}.new(...)", c.name, c.name),
-            ),
-            Some(other) => rt(
-                ErrorKind::Type,
-                format!("'{}' is a {}, not a function", name, other.type_name()),
-            ),
+            Some(Value::Class(c)) => rt(ErrorKind::Type, format!("to create a {} write {}.new(...)", c.name, c.name)),
+            Some(other) => rt(ErrorKind::Type, format!("'{}' is a {}, not a function", name, other.type_name())),
             None => rt(ErrorKind::Name, format!("undefined function '{}'", name)),
         }
     }
@@ -1006,10 +932,7 @@ impl Interpreter {
                 self.call_function(func, self_val, args, span)
             }
             Value::Native(n) => self.call_native(n, args),
-            other => rt(
-                ErrorKind::Type,
-                format!("cannot call a {} like a function", other.type_name()),
-            ),
+            other => rt(ErrorKind::Type, format!("cannot call a {} like a function", other.type_name())),
         }
     }
 
@@ -1022,7 +945,13 @@ impl Interpreter {
             };
             return rt(
                 ErrorKind::Type,
-                format!("{}() expects {} argument{}, got {}", n.name, expected, if expected == "1" { "" } else { "s" }, args.len()),
+                format!(
+                    "{}() expects {} argument{}, got {}",
+                    n.name,
+                    expected,
+                    if expected == "1" { "" } else { "s" },
+                    args.len()
+                ),
             );
         }
         (n.func)(self, &args).map_err(Ctrl::Error)
@@ -1073,7 +1002,7 @@ impl Interpreter {
             source: func.source.clone(),
             top_level: false,
         };
-        let extra: Vec<Value> = args.drain(..).collect();
+        let extra: Vec<Value> = std::mem::take(&mut args);
         let mut given = extra.into_iter();
         let mut pending_defaults = Vec::new();
         for p in &decl.params {
@@ -1112,20 +1041,13 @@ impl Interpreter {
         }
     }
 
-    pub(crate) fn invoke_method(
-        &mut self,
-        recv: &Value,
-        name: &str,
-        args: Vec<Value>,
-        span: Span,
-    ) -> EResult<Value> {
+    pub(crate) fn invoke_method(&mut self, recv: &Value, name: &str, args: Vec<Value>, span: Span) -> EResult<Value> {
         match recv {
             Value::Module(m) => match m.get(name) {
                 Some(f @ (Value::Function(_) | Value::Native(_))) => self.call_callable(&f, args, span),
-                Some(Value::Class(c)) => rt(
-                    ErrorKind::Type,
-                    format!("to create a {} write {}.{}.new(...)", c.name, m.name, c.name),
-                ),
+                Some(Value::Class(c)) => {
+                    rt(ErrorKind::Type, format!("to create a {} write {}.{}.new(...)", c.name, m.name, c.name))
+                }
                 Some(other) => rt(
                     ErrorKind::Type,
                     format!("{}.{} is a {}, not a function (remove the parentheses)", m.name, name, other.type_name()),

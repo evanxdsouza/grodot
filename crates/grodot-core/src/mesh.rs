@@ -168,7 +168,8 @@ impl Mesh {
                             match s {
                                 None | Some("") => Ok(None),
                                 Some(t) => {
-                                    let i: i64 = t.parse().map_err(|_| format!("line {}: bad index '{}'", ln + 1, t))?;
+                                    let i: i64 =
+                                        t.parse().map_err(|_| format!("line {}: bad index '{}'", ln + 1, t))?;
                                     let idx = if i < 0 { len as i64 + i } else { i - 1 };
                                     if idx < 0 || idx as usize >= len {
                                         return Err(format!("line {}: index {} out of range", ln + 1, i));
@@ -177,7 +178,8 @@ impl Mesh {
                                 }
                             }
                         };
-                        let vi = resolve(parts.next(), pos.len())?.ok_or_else(|| format!("line {}: face needs a vertex index", ln + 1))?;
+                        let vi = resolve(parts.next(), pos.len())?
+                            .ok_or_else(|| format!("line {}: face needs a vertex index", ln + 1))?;
                         let _vt = parts.next();
                         let ni = resolve(parts.next(), nrm.len())?;
                         verts.push((vi, ni));
@@ -208,7 +210,8 @@ impl Mesh {
         }
         if need_normals {
             for tri in m.indices.chunks(3) {
-                let (a, b, c) = (m.positions[tri[0] as usize], m.positions[tri[1] as usize], m.positions[tri[2] as usize]);
+                let (a, b, c) =
+                    (m.positions[tri[0] as usize], m.positions[tri[1] as usize], m.positions[tri[2] as usize]);
                 let n = (b - a).cross(c - a).normalized();
                 for &i in tri {
                     if m.normals[i as usize] == Vec3::ZERO || m.normals[i as usize].length_sq() < 0.5 {

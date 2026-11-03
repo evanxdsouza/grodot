@@ -20,7 +20,13 @@ pub fn render_game(canvas: &mut Canvas, renderer: &mut SceneRenderer, rt: &Runti
         }
         None => {
             canvas.clear(0x101114);
-            canvas.text(20, 20, "This scene has no active Camera. Add a Camera entity in the editor.", 0xffd23f, FontId::UiBold);
+            canvas.text(
+                20,
+                20,
+                "This scene has no active Camera. Add a Camera entity in the editor.",
+                0xffd23f,
+                FontId::UiBold,
+            );
         }
     }
     hud::draw_hud(canvas, area, &w);
@@ -90,8 +96,14 @@ pub fn run_game(project: &Project) -> Result<(), String> {
                 let r = match c {
                     AudioCmd::Play { path, volume } => a.play(&path, volume, false, false),
                     AudioCmd::PlayMusic { path, volume } => a.play(&path, volume, true, true),
-                    AudioCmd::StopMusic => Ok(a.stop_music()),
-                    AudioCmd::SetVolume(v) => Ok(a.set_volume(v)),
+                    AudioCmd::StopMusic => {
+                        let _: () = a.stop_music();
+                        Ok(())
+                    }
+                    AudioCmd::SetVolume(v) => {
+                        let _: () = a.set_volume(v);
+                        Ok(())
+                    }
                 };
                 if let Err(e) = r {
                     eprintln!("warning: audio: {}", e);
@@ -125,11 +137,17 @@ fn button_name(b: MouseButton) -> &'static str {
 }
 
 /// Run the game without a window for `frames` frames (CI smoke test). Returns the number of errors.
-pub fn run_headless(project: &Project, frames: u32, screenshot: Option<&std::path::Path>, verbose: bool) -> Result<usize, String> {
+pub fn run_headless(
+    project: &Project,
+    frames: u32,
+    screenshot: Option<&std::path::Path>,
+    verbose: bool,
+) -> Result<usize, String> {
     let mut rt = Runtime::from_project(project)?;
     rt.start();
     let mut errors = 0;
-    let count_errors = |rt: &Runtime| rt.world.borrow().log.entries.iter().filter(|e| e.level == LogLevel::Error).count();
+    let count_errors =
+        |rt: &Runtime| rt.world.borrow().log.entries.iter().filter(|e| e.level == LogLevel::Error).count();
     for _ in 0..frames {
         rt.frame(1.0 / 60.0);
         rt.world.borrow_mut().audio_cmds.clear();

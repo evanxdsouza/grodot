@@ -6,10 +6,10 @@
 
 use crate::physics;
 use crate::world::{AudioCmd, LogLevel, World};
-use groscript::builtins::{num_arg, str_arg, vec3_arg};
-use groscript::{ErrorKind, GroError, GroHash, GroResult, HostObject, Interpreter, Module, Rgba, Value, V2, V3};
 use grodot_core::math::{Color, Quat, Vec3};
 use grodot_core::scene::{BodyType, Component, EntityId, FieldValue, Scene, COMPONENT_TYPES};
+use groscript::builtins::{num_arg, str_arg, vec3_arg};
+use groscript::{ErrorKind, GroError, GroHash, GroResult, HostObject, Interpreter, Module, Rgba, Value, V2, V3};
 use std::any::Any;
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -52,12 +52,7 @@ pub fn field_to_value(f: FieldValue) -> Value {
 }
 
 pub fn value_to_field(v: &Value, like: &FieldValue, name: &str) -> GroResult<FieldValue> {
-    let bad = || {
-        GroError::new(
-            ErrorKind::Type,
-            format!("cannot set '{}' to a {}", name, v.type_name()),
-        )
-    };
+    let bad = || GroError::new(ErrorKind::Type, format!("cannot set '{}' to a {}", name, v.type_name()));
     Ok(match (like, v) {
         (FieldValue::Float(_), Value::Number(n)) => FieldValue::Float(*n as f32),
         (FieldValue::Bool(_), Value::Bool(b)) => FieldValue::Bool(*b),
@@ -113,7 +108,12 @@ impl EntityHandle {
     fn component_name(arg: &Value) -> GroResult<String> {
         let name = match arg {
             Value::Str(s) | Value::Symbol(s) => s.to_string(),
-            other => return Err(GroError::new(ErrorKind::Type, format!("component name must be a String, got {}", other.type_name()))),
+            other => {
+                return Err(GroError::new(
+                    ErrorKind::Type,
+                    format!("component name must be a String, got {}", other.type_name()),
+                ))
+            }
         };
         if !COMPONENT_TYPES.contains(&name.as_str()) {
             return engine_err(format!("unknown component '{}' (known: {})", name, COMPONENT_TYPES.join(", ")));
@@ -148,7 +148,17 @@ impl HostObject for EntityHandle {
 
     fn get_property(&self, name: &str) -> Option<GroResult<Value>> {
         const PROPS: [&str; 12] = [
-            "id", "name", "tag", "active", "position", "world_position", "rotation", "scale", "velocity", "parent", "color",
+            "id",
+            "name",
+            "tag",
+            "active",
+            "position",
+            "world_position",
+            "rotation",
+            "scale",
+            "velocity",
+            "parent",
+            "color",
             "visible",
         ];
         if !PROPS.contains(&name) {
@@ -191,8 +201,18 @@ impl HostObject for EntityHandle {
     }
 
     fn set_property(&self, name: &str, value: Value) -> Option<GroResult<()>> {
-        const PROPS: [&str; 10] =
-            ["name", "tag", "active", "position", "world_position", "rotation", "scale", "velocity", "color", "visible"];
+        const PROPS: [&str; 10] = [
+            "name",
+            "tag",
+            "active",
+            "position",
+            "world_position",
+            "rotation",
+            "scale",
+            "velocity",
+            "color",
+            "visible",
+        ];
         if !PROPS.contains(&name) {
             if name == "id" || name == "parent" {
                 return Some(engine_err(format!("entity.{} is read-only", name)));
@@ -340,12 +360,15 @@ impl HostObject for EntityHandle {
             "add_component" => (|| {
                 argc(1)?;
                 let n = Self::component_name(&args[0])?;
-                let added = self.with(|w| w.scene.entity_mut(self.id).unwrap().add(Component::new_default(&n).unwrap()))?;
+                let added =
+                    self.with(|w| w.scene.entity_mut(self.id).unwrap().add(Component::new_default(&n).unwrap()))?;
                 if !added {
                     return engine_err(format!("entity already has a {} component", n));
                 }
                 if n == "Script" {
-                    return engine_err("scripts cannot be attached from scripts in v0.1; add the Script component in the editor");
+                    return engine_err(
+                        "scripts cannot be attached from scripts in v0.1; add the Script component in the editor",
+                    );
                 }
                 Ok(Value::Host(Rc::new(ComponentRef { entity: self.id, type_name: n, world: self.world.clone() })))
             })(),
@@ -398,7 +421,9 @@ impl HostObject for EntityHandle {
                     Value::Vec3(v) => to_vec3(v),
                     other => match entity_id_of(other) {
                         Some(id) => self.world.borrow().scene.world_matrix(id).get_translation(),
-                        None => return Err(GroError::new(ErrorKind::Type, "distance_to() needs a Vector3 or an Entity")),
+                        None => {
+                            return Err(GroError::new(ErrorKind::Type, "distance_to() needs a Vector3 or an Entity"))
+                        }
                     },
                 };
                 self.with(|w| Value::Number((w.scene.world_matrix(self.id).get_translation() - target).length() as f64))
@@ -627,8 +652,14 @@ pub fn install(interp: &mut Interpreter, world: &WorldRef, timers: &Rc<RefCell<T
             let neg = str_arg(a, 0, "axis")?;
             let pos = str_arg(a, 1, "axis")?;
             let w = w.borrow();
-            let n = w.input.action_down(&neg).ok_or_else(|| GroError::new(ErrorKind::Engine, format!("unknown input action '{}'", neg)))?;
-            let p = w.input.action_down(&pos).ok_or_else(|| GroError::new(ErrorKind::Engine, format!("unknown input action '{}'", pos)))?;
+            let n = w
+                .input
+                .action_down(&neg)
+                .ok_or_else(|| GroError::new(ErrorKind::Engine, format!("unknown input action '{}'", neg)))?;
+            let p = w
+                .input
+                .action_down(&pos)
+                .ok_or_else(|| GroError::new(ErrorKind::Engine, format!("unknown input action '{}'", pos)))?;
             Ok(Value::Number((p as i32 - n as i32) as f64))
         });
     }
@@ -658,7 +689,12 @@ pub fn install(interp: &mut Interpreter, world: &WorldRef, timers: &Rc<RefCell<T
                     "middle" => "MouseMiddle",
                     _ => return engine_err("mouse buttons are \"left\", \"right\" and \"middle\""),
                 },
-                other => return Err(GroError::new(ErrorKind::Type, format!("mouse button must be a String, got {}", other.type_name()))),
+                other => {
+                    return Err(GroError::new(
+                        ErrorKind::Type,
+                        format!("mouse button must be a String, got {}", other.type_name()),
+                    ))
+                }
             };
             Ok(Value::Bool(w.borrow().input.down.contains(key)))
         });

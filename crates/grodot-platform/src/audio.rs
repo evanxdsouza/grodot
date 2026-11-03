@@ -46,7 +46,8 @@ pub fn decode_wav(bytes: &[u8]) -> Result<Clip, String> {
             let channels = u16::from_le_bytes([body[2], body[3]]);
             let rate = u32::from_le_bytes(body[4..8].try_into().unwrap());
             let bits = u16::from_le_bytes([body[14], body[15]]);
-            let format = if format == 0xFFFE && body.len() >= 26 { u16::from_le_bytes([body[24], body[25]]) } else { format };
+            let format =
+                if format == 0xFFFE && body.len() >= 26 { u16::from_le_bytes([body[24], body[25]]) } else { format };
             fmt = Some((format, channels, rate, bits));
         } else if id == b"data" {
             data = Some(body);
@@ -58,7 +59,7 @@ pub fn decode_wav(bytes: &[u8]) -> Result<Clip, String> {
     if channels == 0 || channels > 2 {
         return Err(format!("unsupported channel count {} (use mono or stereo)", channels));
     }
-    if rate < 4000 || rate > 192_000 {
+    if !(4000..=192_000).contains(&rate) {
         return Err(format!("unsupported sample rate {}", rate));
     }
     let bps = (bits / 8) as usize;

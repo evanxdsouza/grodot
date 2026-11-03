@@ -1,8 +1,8 @@
 //! Drive the editor headlessly with synthetic input.
 
+use grodot_core::config::Project;
 use grodot_editor::editor::{Action, Editor};
 use grodot_editor::ui::InputFrame;
-use grodot_core::config::Project;
 use grodot_render::raster;
 use std::path::{Path, PathBuf};
 
@@ -105,10 +105,20 @@ fn undo_redo_and_save_roundtrip() {
 #[test]
 fn script_errors_in_play_mode_are_shown_not_fatal() {
     let (mut ed, t) = editor("err");
-    std::fs::write(t.0.join("scripts/orb.gro"), "class Orb < Entity\n  function update(delta)\n    self.explode()\n  end\nend\n").unwrap();
+    std::fs::write(
+        t.0.join("scripts/orb.gro"),
+        "class Orb < Entity\n  function update(delta)\n    self.explode()\n  end\nend\n",
+    )
+    .unwrap();
     ed.apply(Action::TogglePlay);
     idle(&mut ed, 5);
-    let errors: Vec<String> = ed.log.entries.iter().filter(|e| e.level == grodot_runtime::LogLevel::Error).map(|e| e.message.clone()).collect();
+    let errors: Vec<String> = ed
+        .log
+        .entries
+        .iter()
+        .filter(|e| e.level == grodot_runtime::LogLevel::Error)
+        .map(|e| e.message.clone())
+        .collect();
     assert!(errors.iter().any(|e| e.contains("Method 'explode' does not exist")), "{:?}", errors);
     assert!(ed.play.is_some(), "the editor keeps running");
     ed.apply(Action::TogglePlay);

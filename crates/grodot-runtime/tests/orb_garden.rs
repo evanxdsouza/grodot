@@ -40,7 +40,8 @@ fn run(rt: &mut Runtime, frames: usize) {
 
 fn assert_no_errors(rt: &Runtime) {
     let w = rt.world.borrow();
-    let errors: Vec<_> = w.log.entries.iter().filter(|e| e.level == LogLevel::Error).map(|e| e.message.clone()).collect();
+    let errors: Vec<_> =
+        w.log.entries.iter().filter(|e| e.level == LogLevel::Error).map(|e| e.message.clone()).collect();
     assert!(errors.is_empty(), "script errors:\n{}", errors.join("\n\n"));
 }
 

@@ -27,15 +27,7 @@ impl<'a> Lexer<'a> {
     }
 
     pub fn with_offset(src: &'a str, line: u32, col: u32) -> Self {
-        Lexer {
-            chars: src.chars().collect(),
-            pos: 0,
-            line,
-            col,
-            depth: 0,
-            tokens: Vec::new(),
-            _src: src,
-        }
+        Lexer { chars: src.chars().collect(), pos: 0, line, col, depth: 0, tokens: Vec::new(), _src: src }
     }
 
     fn peek(&self) -> Option<char> {
@@ -59,10 +51,7 @@ impl<'a> Lexer<'a> {
     }
 
     fn push(&mut self, tok: Tok, line: u32, col: u32, len: u32) {
-        self.tokens.push(Token {
-            tok,
-            span: Span::new(line, col, len),
-        });
+        self.tokens.push(Token { tok, span: Span::new(line, col, len) });
     }
 
     fn error(&self, msg: impl Into<String>, line: u32, col: u32) -> GroError {
@@ -84,10 +73,7 @@ impl<'a> Lexer<'a> {
                 '\n' => {
                     self.bump();
                     if self.depth <= 0 {
-                        let last_is_nl = matches!(
-                            self.tokens.last().map(|t| &t.tok),
-                            Some(Tok::Newline) | None
-                        );
+                        let last_is_nl = matches!(self.tokens.last().map(|t| &t.tok), Some(Tok::Newline) | None);
                         if !last_is_nl {
                             self.push(Tok::Newline, line, col, 1);
                         }
@@ -107,18 +93,10 @@ impl<'a> Lexer<'a> {
                     self.bump();
                     let name = self.ident_text();
                     if name.is_empty() {
-                        return Err(self.error(
-                            format!("expected a name after '{}'", c),
-                            line,
-                            col,
-                        ));
+                        return Err(self.error(format!("expected a name after '{}'", c), line, col));
                     }
                     let len = name.chars().count() as u32 + 1;
-                    let tok = if c == '@' {
-                        Tok::IVar(name)
-                    } else {
-                        Tok::GVar(name)
-                    };
+                    let tok = if c == '@' { Tok::IVar(name) } else { Tok::GVar(name) };
                     self.push(tok, line, col, len);
                 }
                 ':' => {
@@ -204,16 +182,10 @@ impl<'a> Lexer<'a> {
         }
         if let Some(c) = self.peek() {
             if is_ident_start(c) {
-                return Err(self.error(
-                    format!("unexpected '{}' after number", c),
-                    self.line,
-                    self.col,
-                ));
+                return Err(self.error(format!("unexpected '{}' after number", c), self.line, self.col));
             }
         }
-        let n: f64 = s
-            .parse()
-            .map_err(|_| self.error(format!("invalid number '{}'", s), line, col))?;
+        let n: f64 = s.parse().map_err(|_| self.error(format!("invalid number '{}'", s), line, col))?;
         self.push(Tok::Number(n), line, col, len);
         Ok(())
     }
@@ -236,9 +208,7 @@ impl<'a> Lexer<'a> {
                 '\n' => return Err(self.error("unterminated string (strings cannot span lines; use \\n)", line, col)),
                 '\\' => {
                     self.bump();
-                    let e = self
-                        .bump()
-                        .ok_or_else(|| self.error("unterminated string", line, col))?;
+                    let e = self.bump().ok_or_else(|| self.error("unterminated string", line, col))?;
                     cur.push(match e {
                         'n' => '\n',
                         't' => '\t',
@@ -267,9 +237,9 @@ impl<'a> Lexer<'a> {
                     let mut depth = 1;
                     let mut in_str = false;
                     loop {
-                        let c = self.bump().ok_or_else(|| {
-                            self.error("unterminated interpolation '#{'", span.line, span.col)
-                        })?;
+                        let c = self
+                            .bump()
+                            .ok_or_else(|| self.error("unterminated interpolation '#{'", span.line, span.col))?;
                         if c == '\n' {
                             return Err(self.error("unterminated interpolation '#{'", span.line, span.col));
                         }
@@ -355,9 +325,7 @@ impl<'a> Lexer<'a> {
                     col,
                 ))
             }
-            (other, _) => {
-                return Err(self.error(format!("unexpected character '{}'", other), line, col))
-            }
+            (other, _) => return Err(self.error(format!("unexpected character '{}'", other), line, col)),
         };
         for _ in 0..len {
             self.bump();
@@ -418,13 +386,7 @@ mod tests {
     fn numbers() {
         assert_eq!(
             toks("1 2.5 1_000"),
-            vec![
-                Tok::Number(1.0),
-                Tok::Number(2.5),
-                Tok::Number(1000.0),
-                Tok::Newline,
-                Tok::Eof
-            ]
+            vec![Tok::Number(1.0), Tok::Number(2.5), Tok::Number(1000.0), Tok::Newline, Tok::Eof]
         );
     }
 
@@ -450,13 +412,7 @@ mod tests {
     fn comments_and_blank_lines() {
         assert_eq!(
             toks("x # hi\n\n\n# more\ny"),
-            vec![
-                Tok::Ident("x".into()),
-                Tok::Newline,
-                Tok::Ident("y".into()),
-                Tok::Newline,
-                Tok::Eof
-            ]
+            vec![Tok::Ident("x".into()), Tok::Newline, Tok::Ident("y".into()), Tok::Newline, Tok::Eof]
         );
     }
 
@@ -464,15 +420,7 @@ mod tests {
     fn newlines_ignored_inside_brackets() {
         assert_eq!(
             toks("[1,\n2]"),
-            vec![
-                Tok::LBracket,
-                Tok::Number(1.0),
-                Tok::Comma,
-                Tok::Number(2.0),
-                Tok::RBracket,
-                Tok::Newline,
-                Tok::Eof
-            ]
+            vec![Tok::LBracket, Tok::Number(1.0), Tok::Comma, Tok::Number(2.0), Tok::RBracket, Tok::Newline, Tok::Eof]
         );
     }
 
@@ -507,10 +455,7 @@ mod tests {
 
     #[test]
     fn string_escapes() {
-        assert_eq!(
-            toks(r#""a\n\"b\#{""#)[0],
-            Tok::Str(vec![StrPart::Lit("a\n\"b#{".into())])
-        );
+        assert_eq!(toks(r#""a\n\"b\#{""#)[0], Tok::Str(vec![StrPart::Lit("a\n\"b#{".into())]));
     }
 
     #[test]

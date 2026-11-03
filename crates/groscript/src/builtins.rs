@@ -13,12 +13,7 @@ fn type_err<T>(msg: impl Into<String>) -> GroResult<T> {
 pub fn num_arg(args: &[Value], i: usize, fname: &str) -> GroResult<f64> {
     match args.get(i) {
         Some(Value::Number(n)) => Ok(*n),
-        Some(other) => type_err(format!(
-            "{}() argument {} must be a Number, got {}",
-            fname,
-            i + 1,
-            other.type_name()
-        )),
+        Some(other) => type_err(format!("{}() argument {} must be a Number, got {}", fname, i + 1, other.type_name())),
         None => type_err(format!("{}() is missing argument {}", fname, i + 1)),
     }
 }
@@ -27,12 +22,7 @@ pub fn str_arg(args: &[Value], i: usize, fname: &str) -> GroResult<Rc<str>> {
     match args.get(i) {
         Some(Value::Str(s)) => Ok(s.clone()),
         Some(Value::Symbol(s)) => Ok(s.clone()),
-        Some(other) => type_err(format!(
-            "{}() argument {} must be a String, got {}",
-            fname,
-            i + 1,
-            other.type_name()
-        )),
+        Some(other) => type_err(format!("{}() argument {} must be a String, got {}", fname, i + 1, other.type_name())),
         None => type_err(format!("{}() is missing argument {}", fname, i + 1)),
     }
 }
@@ -40,12 +30,7 @@ pub fn str_arg(args: &[Value], i: usize, fname: &str) -> GroResult<Rc<str>> {
 pub fn vec3_arg(args: &[Value], i: usize, fname: &str) -> GroResult<V3> {
     match args.get(i) {
         Some(Value::Vec3(v)) => Ok(*v),
-        Some(other) => type_err(format!(
-            "{}() argument {} must be a Vector3, got {}",
-            fname,
-            i + 1,
-            other.type_name()
-        )),
+        Some(other) => type_err(format!("{}() argument {} must be a Vector3, got {}", fname, i + 1, other.type_name())),
         None => type_err(format!("{}() is missing argument {}", fname, i + 1)),
     }
 }
@@ -59,10 +44,7 @@ pub fn install(it: &mut Interpreter) {
             Ok(Value::Nil)
         }),
     );
-    it.set_global(
-        "inspect",
-        Value::native("inspect", 1, Some(1), |_, args| Ok(Value::Str(args[0].inspect().into()))),
-    );
+    it.set_global("inspect", Value::native("inspect", 1, Some(1), |_, args| Ok(Value::Str(args[0].inspect().into()))));
     it.set_global(
         "assert",
         Value::native("assert", 1, Some(2), |_, args| {
@@ -77,23 +59,13 @@ pub fn install(it: &mut Interpreter) {
             }
         }),
     );
-    it.set_global(
-        "type",
-        Value::native("type", 1, Some(1), |_, args| Ok(Value::Str(args[0].type_name().into()))),
-    );
-    it.set_global(
-        "str",
-        Value::native("str", 1, Some(1), |_, args| Ok(Value::Str(args[0].to_display().into()))),
-    );
+    it.set_global("type", Value::native("type", 1, Some(1), |_, args| Ok(Value::Str(args[0].type_name().into()))));
+    it.set_global("str", Value::native("str", 1, Some(1), |_, args| Ok(Value::Str(args[0].to_display().into()))));
     it.set_global(
         "num",
         Value::native("num", 1, Some(1), |_, args| match &args[0] {
             Value::Number(n) => Ok(Value::Number(*n)),
-            Value::Str(s) => Ok(s
-                .trim()
-                .parse::<f64>()
-                .map(Value::Number)
-                .unwrap_or(Value::Nil)),
+            Value::Str(s) => Ok(s.trim().parse::<f64>().map(Value::Number).unwrap_or(Value::Nil)),
             Value::Bool(b) => Ok(Value::Number(if *b { 1.0 } else { 0.0 })),
             other => type_err(format!("num() cannot convert a {}", other.type_name())),
         }),
@@ -137,7 +109,15 @@ pub fn install(it: &mut Interpreter) {
     unary(&math, "sin", f64::sin);
     unary(&math, "cos", f64::cos);
     unary(&math, "tan", f64::tan);
-    unary(&math, "sign", |x| if x > 0.0 { 1.0 } else if x < 0.0 { -1.0 } else { 0.0 });
+    unary(&math, "sign", |x| {
+        if x > 0.0 {
+            1.0
+        } else if x < 0.0 {
+            -1.0
+        } else {
+            0.0
+        }
+    });
     unary(&math, "deg_to_rad", f64::to_radians);
     unary(&math, "rad_to_deg", f64::to_degrees);
     math.native("sqrt", 1, Some(1), |_, a| {
@@ -165,19 +145,11 @@ pub fn install(it: &mut Interpreter) {
         Ok(Value::Number(m))
     });
     math.native("clamp", 3, Some(3), |_, a| {
-        let (v, lo, hi) = (
-            num_arg(a, 0, "Math.clamp")?,
-            num_arg(a, 1, "Math.clamp")?,
-            num_arg(a, 2, "Math.clamp")?,
-        );
+        let (v, lo, hi) = (num_arg(a, 0, "Math.clamp")?, num_arg(a, 1, "Math.clamp")?, num_arg(a, 2, "Math.clamp")?);
         Ok(Value::Number(v.max(lo).min(hi)))
     });
     math.native("lerp", 3, Some(3), |_, a| {
-        let (x, y, t) = (
-            num_arg(a, 0, "Math.lerp")?,
-            num_arg(a, 1, "Math.lerp")?,
-            num_arg(a, 2, "Math.lerp")?,
-        );
+        let (x, y, t) = (num_arg(a, 0, "Math.lerp")?, num_arg(a, 1, "Math.lerp")?, num_arg(a, 2, "Math.lerp")?);
         Ok(Value::Number(x + (y - x) * t))
     });
     math.native("random", 0, Some(0), |it, _| Ok(Value::Number(it.next_random())));
@@ -198,7 +170,13 @@ pub fn install(it: &mut Interpreter) {
     // ---------------------------------------------------------------- Vector types
     let v3 = Module::new("Vector3");
     v3.native("new", 0, Some(3), |_, a| {
-        let g = |i| -> GroResult<f64> { if a.len() > i { num_arg(a, i, "Vector3.new") } else { Ok(0.0) } };
+        let g = |i| -> GroResult<f64> {
+            if a.len() > i {
+                num_arg(a, i, "Vector3.new")
+            } else {
+                Ok(0.0)
+            }
+        };
         Ok(Value::vec3(g(0)?, g(1)?, g(2)?))
     });
     v3.set("ZERO", Value::vec3(0.0, 0.0, 0.0));
@@ -213,7 +191,13 @@ pub fn install(it: &mut Interpreter) {
 
     let v2 = Module::new("Vector2");
     v2.native("new", 0, Some(2), |_, a| {
-        let g = |i| -> GroResult<f64> { if a.len() > i { num_arg(a, i, "Vector2.new") } else { Ok(0.0) } };
+        let g = |i| -> GroResult<f64> {
+            if a.len() > i {
+                num_arg(a, i, "Vector2.new")
+            } else {
+                Ok(0.0)
+            }
+        };
         Ok(Value::Vec2(V2 { x: g(0)?, y: g(1)? }))
     });
     v2.set("ZERO", Value::Vec2(V2 { x: 0.0, y: 0.0 }));
@@ -362,13 +346,7 @@ fn op_error(op: BinOp, a: &Value, b: &Value) -> GroResult<Value> {
         }
         _ => "",
     };
-    type_err(format!(
-        "cannot use '{}' with {} and {}{}",
-        op.symbol(),
-        a.type_name(),
-        b.type_name(),
-        hint
-    ))
+    type_err(format!("cannot use '{}' with {} and {}{}", op.symbol(), a.type_name(), b.type_name(), hint))
 }
 
 // ------------------------------------------------------------------ indexing
@@ -402,9 +380,7 @@ pub fn index_get(o: &Value, i: &Value) -> GroResult<Value> {
         }
         Value::Str(s) => {
             let chars: Vec<char> = s.chars().collect();
-            Ok(array_index(chars.len(), i)?
-                .map(|ix| Value::Str(chars[ix].to_string().into()))
-                .unwrap_or(Value::Nil))
+            Ok(array_index(chars.len(), i)?.map(|ix| Value::Str(chars[ix].to_string().into())).unwrap_or(Value::Nil))
         }
         other => type_err(format!("cannot index into a {}", other.type_name())),
     }
@@ -426,10 +402,9 @@ pub fn index_set(o: &Value, i: &Value, v: Value) -> GroResult<()> {
                     a[ix] = v;
                     Ok(())
                 }
-                None => err(
-                    ErrorKind::Runtime,
-                    format!("array index {} is out of range (length {})", i.inspect(), len),
-                ),
+                None => {
+                    err(ErrorKind::Runtime, format!("array index {} is out of range (length {})", i.inspect(), len))
+                }
             }
         }
         Value::Hash(h) => {
@@ -457,22 +432,16 @@ pub fn value_property(o: &Value, name: &str) -> GroResult<Value> {
         (Value::Color(c), "g") => Ok(Value::Number(c.g)),
         (Value::Color(c), "b") => Ok(Value::Number(c.b)),
         (Value::Color(c), "a") => Ok(Value::Number(c.a)),
-        (Value::Array(_) | Value::Str(_) | Value::Hash(_), _) if has_method(o, name) => type_err(format!(
-            "'{}' is a method; call it with {}()",
-            name, name
-        )),
-        (Value::Hash(_), _) => err(
-            ErrorKind::Property,
-            format!("hashes have no properties; to read a key write h[:{}]", name),
-        ),
-        (Value::Vec3(_) | Value::Vec2(_), _) if has_method(o, name) => type_err(format!(
-            "'{}' is a method; call it with {}()",
-            name, name
-        )),
-        _ => err(
-            ErrorKind::Property,
-            format!("unknown property '{}' on {}", name, o.type_name()),
-        ),
+        (Value::Array(_) | Value::Str(_) | Value::Hash(_), _) if has_method(o, name) => {
+            type_err(format!("'{}' is a method; call it with {}()", name, name))
+        }
+        (Value::Hash(_), _) => {
+            err(ErrorKind::Property, format!("hashes have no properties; to read a key write h[:{}]", name))
+        }
+        (Value::Vec3(_) | Value::Vec2(_), _) if has_method(o, name) => {
+            type_err(format!("'{}' is a method; call it with {}()", name, name))
+        }
+        _ => err(ErrorKind::Property, format!("unknown property '{}' on {}", name, o.type_name())),
     }
 }
 
@@ -488,17 +457,44 @@ fn has_method(o: &Value, name: &str) -> bool {
 }
 
 const STRING_METHODS: [&str; 14] = [
-    "length", "upcase", "downcase", "contains?", "starts_with?", "ends_with?", "replace", "split", "trim",
-    "empty?", "reverse", "chars", "to_n", "capitalize",
+    "length",
+    "upcase",
+    "downcase",
+    "contains?",
+    "starts_with?",
+    "ends_with?",
+    "replace",
+    "split",
+    "trim",
+    "empty?",
+    "reverse",
+    "chars",
+    "to_n",
+    "capitalize",
 ];
 const ARRAY_METHODS: [&str; 18] = [
-    "push", "pop", "remove", "remove_at", "contains?", "clear", "length", "empty?", "first", "last", "reverse",
-    "sort", "join", "index_of", "insert", "shuffle", "sum", "copy",
+    "push",
+    "pop",
+    "remove",
+    "remove_at",
+    "contains?",
+    "clear",
+    "length",
+    "empty?",
+    "first",
+    "last",
+    "reverse",
+    "sort",
+    "join",
+    "index_of",
+    "insert",
+    "shuffle",
+    "sum",
+    "copy",
 ];
 const HASH_METHODS: [&str; 8] = ["keys", "values", "contains?", "remove", "clear", "length", "empty?", "get"];
-const VECTOR_METHODS: [&str; 10] = [
-    "length", "normalized", "dot", "cross", "distance_to", "lerp", "with_x", "with_y", "with_z", "abs",
-];
+const VECTOR_METHODS: [&str; 10] =
+    ["length", "normalized", "dot", "cross", "distance_to", "lerp", "with_x", "with_y", "with_z", "abs"];
 
 // ------------------------------------------------------------------ methods
 
@@ -759,8 +755,7 @@ fn array_method(
 
 fn hash_method(h: &Rc<std::cell::RefCell<GroHash>>, name: &str, args: &[Value]) -> Option<GroResult<Value>> {
     let key_of = |v: &Value| -> GroResult<HashKey> {
-        v.hash_key()
-            .ok_or_else(|| GroError::new(ErrorKind::Type, format!("a {} cannot be a hash key", v.type_name())))
+        v.hash_key().ok_or_else(|| GroError::new(ErrorKind::Type, format!("a {} cannot be a hash key", v.type_name())))
     };
     let r = (|| -> GroResult<Value> {
         Ok(match name {

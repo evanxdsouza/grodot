@@ -58,11 +58,7 @@ fn golden_language_tests() {
             continue;
         }
         let expected = std::fs::read_to_string(&out_path).unwrap_or_default();
-        let ok = if expect_error {
-            expected.lines().all(|l| actual.contains(l))
-        } else {
-            expected == actual
-        };
+        let ok = if expect_error { expected.lines().all(|l| actual.contains(l)) } else { expected == actual };
         if !ok {
             failures.push(format!("{}:\n--- expected\n{}\n--- actual\n{}", name, expected, actual));
         }

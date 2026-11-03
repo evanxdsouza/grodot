@@ -12,10 +12,8 @@ struct Entry {
 }
 
 fn slug(name: &str) -> String {
-    let s: String = name
-        .chars()
-        .map(|c| if c.is_ascii_alphanumeric() { c.to_ascii_lowercase() } else { '-' })
-        .collect();
+    let s: String =
+        name.chars().map(|c| if c.is_ascii_alphanumeric() { c.to_ascii_lowercase() } else { '-' }).collect();
     let s = s.trim_matches('-').to_string();
     let mut out = String::new();
     for c in s.chars() {
@@ -31,7 +29,8 @@ fn slug(name: &str) -> String {
 }
 
 fn collect(root: &Path, dir: &Path, prefix: &str, out: &mut Vec<Entry>) -> Result<(), String> {
-    let mut items: Vec<_> = std::fs::read_dir(dir).map_err(|e| e.to_string())?.filter_map(|e| e.ok()).map(|e| e.path()).collect();
+    let mut items: Vec<_> =
+        std::fs::read_dir(dir).map_err(|e| e.to_string())?.filter_map(|e| e.ok()).map(|e| e.path()).collect();
     items.sort();
     for p in items {
         let name = p.file_name().unwrap().to_string_lossy().to_string();
@@ -42,7 +41,11 @@ fn collect(root: &Path, dir: &Path, prefix: &str, out: &mut Vec<Entry>) -> Resul
             collect(root, &p, prefix, out)?;
         } else {
             let rel = p.strip_prefix(root).unwrap().to_string_lossy().replace('\\', "/");
-            out.push(Entry { path: format!("{}/{}", prefix, rel), data: std::fs::read(&p).map_err(|e| e.to_string())?, mode: 0o644 });
+            out.push(Entry {
+                path: format!("{}/{}", prefix, rel),
+                data: std::fs::read(&p).map_err(|e| e.to_string())?,
+                mode: 0o644,
+            });
         }
     }
     Ok(())
@@ -119,9 +122,9 @@ fn write_tar(entries: &[Entry]) -> Result<Vec<u8>, String> {
         out.extend_from_slice(&h);
         out.extend_from_slice(&e.data);
         let pad = (512 - e.data.len() % 512) % 512;
-        out.extend(std::iter::repeat(0).take(pad));
+        out.extend(std::iter::repeat_n(0, pad));
     }
-    out.extend(std::iter::repeat(0).take(1024));
+    out.extend(std::iter::repeat_n(0, 1024));
     Ok(out)
 }
 

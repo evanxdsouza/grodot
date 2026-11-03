@@ -49,12 +49,7 @@ pub trait HostObject {
     /// Write a property. `None` means "no such property".
     fn set_property(&self, name: &str, value: Value) -> Option<GroResult<()>>;
     /// Call a method. `None` means "no such method".
-    fn call_method(
-        &self,
-        interp: &mut Interpreter,
-        name: &str,
-        args: &[Value],
-    ) -> Option<GroResult<Value>>;
+    fn call_method(&self, interp: &mut Interpreter, name: &str, args: &[Value]) -> Option<GroResult<Value>>;
     /// Stable identity used for equality.
     fn identity(&self) -> u64;
     /// A script object attached to this host object (for entities with scripts).
@@ -146,10 +141,7 @@ pub struct Module {
 
 impl Module {
     pub fn new(name: &str) -> Rc<Module> {
-        Rc::new(Module {
-            name: name.into(),
-            members: RefCell::new(HashMap::new()),
-        })
+        Rc::new(Module { name: name.into(), members: RefCell::new(HashMap::new()) })
     }
 
     pub fn get(&self, name: &str) -> Option<Value> {
@@ -266,7 +258,11 @@ pub fn fmt_num(n: f64) -> String {
     if n.is_nan() {
         "nan".into()
     } else if n.is_infinite() {
-        if n > 0.0 { "inf".into() } else { "-inf".into() }
+        if n > 0.0 {
+            "inf".into()
+        } else {
+            "-inf".into()
+        }
     } else if n.fract() == 0.0 && n.abs() < 1e15 {
         format!("{}", n as i64)
     } else {
@@ -300,12 +296,7 @@ impl Value {
     where
         F: Fn(&mut Interpreter, &[Value]) -> GroResult<Value> + 'static,
     {
-        Value::Native(Rc::new(NativeFunction {
-            name: name.into(),
-            min_args: min,
-            max_args: max,
-            func: Box::new(f),
-        }))
+        Value::Native(Rc::new(NativeFunction { name: name.into(), min_args: min, max_args: max, func: Box::new(f) }))
     }
 
     pub fn truthy(&self) -> bool {
@@ -415,10 +406,10 @@ impl Value {
                     out.push_str("{}");
                     return;
                 }
-                out.push_str("{");
+                out.push('{');
                 for (i, k) in h.keys.iter().enumerate() {
                     if i > 0 {
-                        out.push_str(",");
+                        out.push(',');
                     }
                     out.push(' ');
                     match k {
@@ -460,23 +451,10 @@ impl Value {
                 let _ = write!(out, "Vector2({}, {})", fmt_num(v.x), fmt_num(v.y));
             }
             Value::Vec3(v) => {
-                let _ = write!(
-                    out,
-                    "Vector3({}, {}, {})",
-                    fmt_num(v.x),
-                    fmt_num(v.y),
-                    fmt_num(v.z)
-                );
+                let _ = write!(out, "Vector3({}, {}, {})", fmt_num(v.x), fmt_num(v.y), fmt_num(v.z));
             }
             Value::Color(c) => {
-                let _ = write!(
-                    out,
-                    "Color({}, {}, {}, {})",
-                    fmt_num(c.r),
-                    fmt_num(c.g),
-                    fmt_num(c.b),
-                    fmt_num(c.a)
-                );
+                let _ = write!(out, "Color({}, {}, {}, {})", fmt_num(c.r), fmt_num(c.g), fmt_num(c.b), fmt_num(c.a));
             }
             Value::Host(h) => out.push_str(&h.describe()),
         }

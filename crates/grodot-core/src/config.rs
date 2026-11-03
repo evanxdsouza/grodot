@@ -31,9 +31,7 @@ pub fn parse_toml(src: &str) -> Result<TomlDoc, String> {
             doc.entry(section.clone()).or_default();
             continue;
         }
-        let (k, v) = line
-            .split_once('=')
-            .ok_or_else(|| format!("line {}: expected 'key = value'", line_no))?;
+        let (k, v) = line.split_once('=').ok_or_else(|| format!("line {}: expected 'key = value'", line_no))?;
         let key = k.trim().to_string();
         let v = v.trim();
         let value = if v.starts_with('"') {

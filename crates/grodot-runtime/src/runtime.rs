@@ -3,10 +3,10 @@
 use crate::bindings::{self, entity_value, Timers, WorldRef};
 use crate::physics;
 use crate::world::{CollisionKind, LogLevel, World};
-use groscript::ast::StmtKind;
-use groscript::{Class, GroError, Interpreter, Value};
 use grodot_core::config::Project;
 use grodot_core::scene::{Component, EntityId, Scene};
+use groscript::ast::StmtKind;
+use groscript::{Class, GroError, Interpreter, Value};
 use std::cell::RefCell;
 use std::collections::{BTreeMap, HashMap};
 use std::path::PathBuf;
@@ -43,7 +43,15 @@ impl Runtime {
         interp.step_limit = SCRIPT_BUDGET;
         interp.import_root = project_root.map(|r| r.join("scripts"));
         bindings::install(&mut interp, &world, &timers);
-        Runtime { world, interp, scripts: Vec::new(), timers, classes: HashMap::new(), accumulator: 0.0, started: false }
+        Runtime {
+            world,
+            interp,
+            scripts: Vec::new(),
+            timers,
+            classes: HashMap::new(),
+            accumulator: 0.0,
+            started: false,
+        }
     }
 
     /// Load a project's main scene.
@@ -80,7 +88,9 @@ impl Runtime {
                 let Some(e) = w.scene.entity(id) else { continue };
                 let script = e.script().filter(|s| s.enabled && !s.path.is_empty()).map(|s| s.path.clone());
                 let autoplay = match e.get("AudioSource") {
-                    Some(Component::AudioSource(a)) if a.autoplay && !a.clip.is_empty() => Some((a.clip.clone(), a.volume, a.looping)),
+                    Some(Component::AudioSource(a)) if a.autoplay && !a.clip.is_empty() => {
+                        Some((a.clip.clone(), a.volume, a.looping))
+                    }
                     _ => None,
                 };
                 (script, autoplay)
@@ -159,10 +169,7 @@ impl Runtime {
                     }
                 }
             }
-            Err(format!(
-                "{} must define a class that extends Entity (for example: class Player < Entity)",
-                path
-            ))
+            Err(format!("{} must define a class that extends Entity (for example: class Player < Entity)", path))
         })();
         self.classes.insert(path.to_string(), result.clone());
         result
@@ -351,10 +358,11 @@ impl Runtime {
             Ok(p) => p,
             Err(e) => return self.log(LogLevel::Error, e),
         };
-        let scene = match std::fs::read_to_string(&full).map_err(|e| e.to_string()).and_then(|s| Scene::from_json_str(&s)) {
-            Ok(s) => s,
-            Err(e) => return self.log(LogLevel::Error, format!("cannot load scene '{}': {}", path, e)),
-        };
+        let scene =
+            match std::fs::read_to_string(&full).map_err(|e| e.to_string()).and_then(|s| Scene::from_json_str(&s)) {
+                Ok(s) => s,
+                Err(e) => return self.log(LogLevel::Error, format!("cannot load scene '{}': {}", path, e)),
+            };
         self.shutdown_scripts();
         {
             let mut w = self.world.borrow_mut();

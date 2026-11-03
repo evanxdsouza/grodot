@@ -94,7 +94,7 @@ impl Json {
             Json::Bool(b) => out.push_str(if *b { "true" } else { "false" }),
             Json::Num(n) => {
                 if !n.is_finite() {
-                    out.push_str("0");
+                    out.push('0');
                 } else if n.fract() == 0.0 && n.abs() < 1e15 {
                     let _ = write!(out, "{}", *n as i64);
                 } else {
@@ -323,8 +323,10 @@ impl<'a> P<'a> {
                                 b'\\' => out.push(b'\\'),
                                 b'"' => out.push(b'"'),
                                 b'u' => {
-                                    let hex = std::str::from_utf8(self.s.get(self.i..self.i + 4).ok_or_else(|| self.err("bad \\u escape"))?)
-                                        .map_err(|_| self.err("bad \\u escape"))?;
+                                    let hex = std::str::from_utf8(
+                                        self.s.get(self.i..self.i + 4).ok_or_else(|| self.err("bad \\u escape"))?,
+                                    )
+                                    .map_err(|_| self.err("bad \\u escape"))?;
                                     let cp = u32::from_str_radix(hex, 16).map_err(|_| self.err("bad \\u escape"))?;
                                     self.i += 4;
                                     let ch = char::from_u32(cp).unwrap_or('\u{fffd}');
@@ -354,7 +356,8 @@ impl<'a> P<'a> {
             Some(c) if *c == b'-' || c.is_ascii_digit() => {
                 let start = self.i;
                 self.i += 1;
-                while self.i < self.s.len() && matches!(self.s[self.i], b'0'..=b'9' | b'.' | b'e' | b'E' | b'+' | b'-') {
+                while self.i < self.s.len() && matches!(self.s[self.i], b'0'..=b'9' | b'.' | b'e' | b'E' | b'+' | b'-')
+                {
                     self.i += 1;
                 }
                 let t = std::str::from_utf8(&self.s[start..self.i]).unwrap();

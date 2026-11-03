@@ -41,7 +41,10 @@ impl InputCollector {
                     self.frame.left_pressed = true;
                     let now = Instant::now();
                     if let Some((t, p)) = self.last_click {
-                        if now.duration_since(t).as_millis() < 400 && (p.0 - self.mouse.0).abs() < 5.0 && (p.1 - self.mouse.1).abs() < 5.0 {
+                        if now.duration_since(t).as_millis() < 400
+                            && (p.0 - self.mouse.0).abs() < 5.0
+                            && (p.1 - self.mouse.1).abs() < 5.0
+                        {
                             self.frame.double_click = true;
                         }
                     }

@@ -230,10 +230,7 @@ impl Component {
                 ("gravity", F::Bool(b.gravity)),
             ],
             Component::Collider(c) => vec![
-                (
-                    "shape",
-                    F::Choice(if c.shape == Shape::Box { "box" } else { "sphere" }.into(), &["box", "sphere"]),
-                ),
+                ("shape", F::Choice(if c.shape == Shape::Box { "box" } else { "sphere" }.into(), &["box", "sphere"])),
                 ("size", F::Vec3(c.size)),
                 ("radius", F::Float(c.radius)),
                 ("offset", F::Vec3(c.offset)),
@@ -274,9 +271,24 @@ impl Component {
                 F::Vec3(s) if s.is_finite() => t.scale = s,
                 _ => return bad(),
             },
-            (Component::Camera(c), "field_of_view") => c.fov = { let f = fnum?; f.clamp(1.0, 170.0) },
-            (Component::Camera(c), "near_clip") => c.near = { let f = fnum?; f.max(0.001) },
-            (Component::Camera(c), "far_clip") => c.far = { let f = fnum?; f.max(0.01) },
+            (Component::Camera(c), "field_of_view") => {
+                c.fov = {
+                    let f = fnum?;
+                    f.clamp(1.0, 170.0)
+                }
+            }
+            (Component::Camera(c), "near_clip") => {
+                c.near = {
+                    let f = fnum?;
+                    f.max(0.001)
+                }
+            }
+            (Component::Camera(c), "far_clip") => {
+                c.far = {
+                    let f = fnum?;
+                    f.max(0.01)
+                }
+            }
             (Component::Camera(c), "active") => match v {
                 F::Bool(b) => c.active = b,
                 _ => return bad(),
@@ -303,7 +315,12 @@ impl Component {
                 }
                 _ => return bad(),
             },
-            (Component::RigidBody(b), "mass") => b.mass = { let f = fnum?; f.max(0.001) },
+            (Component::RigidBody(b), "mass") => {
+                b.mass = {
+                    let f = fnum?;
+                    f.max(0.001)
+                }
+            }
             (Component::RigidBody(b), "velocity") => match v {
                 F::Vec3(p) if p.is_finite() => b.velocity = p,
                 _ => return bad(),
@@ -326,7 +343,12 @@ impl Component {
                 F::Vec3(p) if p.is_finite() => c.size = p.abs(),
                 _ => return bad(),
             },
-            (Component::Collider(c), "radius") => c.radius = { let f = fnum?; f.abs() },
+            (Component::Collider(c), "radius") => {
+                c.radius = {
+                    let f = fnum?;
+                    f.abs()
+                }
+            }
             (Component::Collider(c), "offset") => match v {
                 F::Vec3(p) if p.is_finite() => c.offset = p,
                 _ => return bad(),
@@ -335,13 +357,28 @@ impl Component {
                 F::Bool(b) => c.sensor = b,
                 _ => return bad(),
             },
-            (Component::Collider(c), "friction") => c.friction = { let f = fnum?; f.clamp(0.0, 1.0) },
-            (Component::Collider(c), "restitution") => c.restitution = { let f = fnum?; f.clamp(0.0, 1.0) },
+            (Component::Collider(c), "friction") => {
+                c.friction = {
+                    let f = fnum?;
+                    f.clamp(0.0, 1.0)
+                }
+            }
+            (Component::Collider(c), "restitution") => {
+                c.restitution = {
+                    let f = fnum?;
+                    f.clamp(0.0, 1.0)
+                }
+            }
             (Component::AudioSource(a), "clip") => match v {
                 F::Text(s) => a.clip = s,
                 _ => return bad(),
             },
-            (Component::AudioSource(a), "volume") => a.volume = { let f = fnum?; f.clamp(0.0, 4.0) },
+            (Component::AudioSource(a), "volume") => {
+                a.volume = {
+                    let f = fnum?;
+                    f.clamp(0.0, 4.0)
+                }
+            }
             (Component::AudioSource(a), "looping") => match v {
                 F::Bool(b) => a.looping = b,
                 _ => return bad(),
@@ -362,7 +399,12 @@ impl Component {
                 F::Color(c) => l.color = c,
                 _ => return bad(),
             },
-            (Component::Light(l), "intensity") => l.intensity = { let f = fnum?; f.max(0.0) },
+            (Component::Light(l), "intensity") => {
+                l.intensity = {
+                    let f = fnum?;
+                    f.max(0.0)
+                }
+            }
             (_, _) => return Err(format!("{} has no property '{}'", type_name, name)),
         }
         Ok(())
@@ -375,11 +417,9 @@ impl Component {
                 .with("position", t.position.to_array())
                 .with("rotation", t.rotation.to_array())
                 .with("scale", t.scale.to_array()),
-            Component::Camera(c) => base
-                .with("fov", c.fov)
-                .with("near", c.near)
-                .with("far", c.far)
-                .with("active", c.active),
+            Component::Camera(c) => {
+                base.with("fov", c.fov).with("near", c.near).with("far", c.far).with("active", c.active)
+            }
             Component::MeshRenderer(m) => base
                 .with("mesh", m.mesh.as_str())
                 .with("color", m.color.to_hex())
@@ -410,9 +450,8 @@ impl Component {
 
     pub fn from_json(j: &Json) -> Result<Component, String> {
         let ty = j.get("type").and_then(|t| t.as_str()).ok_or("component is missing \"type\"")?;
-        let mut c = Component::new_default(ty).ok_or_else(|| {
-            format!("unknown component type \"{}\" (known: {})", ty, COMPONENT_TYPES.join(", "))
-        })?;
+        let mut c = Component::new_default(ty)
+            .ok_or_else(|| format!("unknown component type \"{}\" (known: {})", ty, COMPONENT_TYPES.join(", ")))?;
         let f32_of = |key: &str| -> Result<Option<f32>, String> {
             match j.get(key) {
                 None => Ok(None),
@@ -506,8 +545,9 @@ impl Component {
             }
             Component::RigidBody(b) => {
                 if let Some(v) = str_of("body_type")? {
-                    b.body_type = BodyType::parse(&v)
-                        .ok_or_else(|| format!("RigidBody.body_type must be static, dynamic or kinematic (got \"{}\")", v))?;
+                    b.body_type = BodyType::parse(&v).ok_or_else(|| {
+                        format!("RigidBody.body_type must be static, dynamic or kinematic (got \"{}\")", v)
+                    })?;
                 }
                 if let Some(v) = f32_of("mass")? {
                     b.mass = v.max(0.001);
@@ -842,15 +882,9 @@ impl Scene {
     }
 
     pub fn from_json(j: &Json) -> Result<Scene, String> {
-        let version = j
-            .get("scene_version")
-            .and_then(|v| v.as_f64())
-            .ok_or("missing \"scene_version\"")? as u32;
+        let version = j.get("scene_version").and_then(|v| v.as_f64()).ok_or("missing \"scene_version\"")? as u32;
         if version > SCENE_VERSION {
-            return Err(format!(
-                "scene_version {} is newer than this Grodot supports ({})",
-                version, SCENE_VERSION
-            ));
+            return Err(format!("scene_version {} is newer than this Grodot supports ({})", version, SCENE_VERSION));
         }
         let mut scene = Scene::new(j.get("name").and_then(|v| v.as_str()).unwrap_or("Scene"));
         if let Some(env) = j.get("environment") {
@@ -867,10 +901,8 @@ impl Scene {
         for (i, ej) in ents.iter().enumerate() {
             let name = ej.get("name").and_then(|v| v.as_str()).unwrap_or("Entity").to_string();
             let ctx = |m: String| format!("entity #{} (\"{}\"): {}", i, name, m);
-            let id = ej
-                .get("id")
-                .and_then(|v| v.as_f64())
-                .ok_or_else(|| ctx("missing numeric \"id\"".into()))? as EntityId;
+            let id =
+                ej.get("id").and_then(|v| v.as_f64()).ok_or_else(|| ctx("missing numeric \"id\"".into()))? as EntityId;
             if scene.entities.iter().any(|e| e.id == id) {
                 return Err(ctx(format!("duplicate id {}", id)));
             }
@@ -960,7 +992,8 @@ mod tests {
 
     #[test]
     fn rejects_bad_field_type() {
-        let src = r#"{"scene_version":1,"entities":[{"id":1,"name":"X","components":[{"type":"Camera","fov":"wide"}]}]}"#;
+        let src =
+            r#"{"scene_version":1,"entities":[{"id":1,"name":"X","components":[{"type":"Camera","fov":"wide"}]}]}"#;
         let e = Scene::from_json_str(src).unwrap_err();
         assert!(e.contains("Camera.fov must be a number"), "{}", e);
     }

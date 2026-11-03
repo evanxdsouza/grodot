@@ -189,7 +189,13 @@ impl Ui {
     fn button_impl(&mut self, r: Rect, text: &str, bg: Rgb, hover_bg: Rgb, fg: Rgb) -> bool {
         let hov = self.hovered(r);
         let pressed = hov && self.input.left_down;
-        let c = if pressed { BUTTON_ACTIVE } else if hov { hover_bg } else { bg };
+        let c = if pressed {
+            BUTTON_ACTIVE
+        } else if hov {
+            hover_bg
+        } else {
+            bg
+        };
         self.canvas.fill_round_rect(r, c, 255);
         self.label_centered(r, text, fg, FontId::Ui);
         self.clicked(r)
@@ -219,7 +225,17 @@ impl Ui {
     pub fn checkbox(&mut self, r: Rect, value: &mut bool) -> bool {
         let b = Rect::new(r.x, r.y + (r.h - 16) / 2, 16, 16);
         let hov = self.hovered(b.shrink(-2));
-        self.canvas.fill_round_rect(b, if *value { ACCENT } else if hov { BUTTON_HOVER } else { FIELD }, 255);
+        self.canvas.fill_round_rect(
+            b,
+            if *value {
+                ACCENT
+            } else if hov {
+                BUTTON_HOVER
+            } else {
+                FIELD
+            },
+            255,
+        );
         self.canvas.stroke_rect(b, if *value { ACCENT } else { BORDER });
         if *value {
             // check mark
@@ -317,7 +333,16 @@ impl Ui {
         // draw
         let focused = self.focus == Some(id);
         self.canvas.fill_rect(r, FIELD);
-        self.canvas.stroke_rect(r, if focused { ACCENT } else if hov { BUTTON_HOVER } else { BORDER });
+        self.canvas.stroke_rect(
+            r,
+            if focused {
+                ACCENT
+            } else if hov {
+                BUTTON_HOVER
+            } else {
+                BORDER
+            },
+        );
         let shown = if focused { self.edit_buffer.clone() } else { value.clone() };
         let inner = r.shrink(1);
         let old = self.canvas.clip;
@@ -391,7 +416,13 @@ impl Ui {
                 self.active = None;
             }
         }
-        let bg = if self.active == Some(id) { BUTTON_ACTIVE } else if hov { 0x222429 } else { FIELD };
+        let bg = if self.active == Some(id) {
+            BUTTON_ACTIVE
+        } else if hov {
+            0x222429
+        } else {
+            FIELD
+        };
         self.canvas.fill_rect(r, bg);
         self.canvas.stroke_rect(r, BORDER);
         if let Some(a) = accent {
@@ -447,7 +478,13 @@ impl Ui {
     /// Popup menu; returns the index chosen. Call every frame while open.
     pub fn popup_menu(&mut self, x: i32, y: i32, title: &str, items: &[String]) -> PopupResult {
         let row_h = 24;
-        let w = items.iter().map(|s| self.canvas.measure(s, FontId::Ui)).max().unwrap_or(80).max(self.canvas.measure(title, FontId::UiBold)) + 40;
+        let w = items
+            .iter()
+            .map(|s| self.canvas.measure(s, FontId::Ui))
+            .max()
+            .unwrap_or(80)
+            .max(self.canvas.measure(title, FontId::UiBold))
+            + 40;
         let h = row_h * items.len() as i32 + 30;
         let x = x.min(self.canvas.width as i32 - w - 4).max(0);
         let y = y.min(self.canvas.height as i32 - h - 4).max(0);
@@ -465,7 +502,10 @@ impl Ui {
                 result = PopupResult::Chosen(i);
             }
         }
-        if result == PopupResult::Open && (self.input.left_pressed && !r.contains(self.input.mouse.0 as i32, self.input.mouse.1 as i32) || self.key("Escape")) {
+        if result == PopupResult::Open
+            && (self.input.left_pressed && !r.contains(self.input.mouse.0 as i32, self.input.mouse.1 as i32)
+                || self.key("Escape"))
+        {
             result = PopupResult::Closed;
         }
         self.modal_layer = false;
@@ -524,7 +564,10 @@ mod tests {
         frame(&mut ui, InputFrame { mouse: (20.0, 20.0), text: "Player".into(), ..Default::default() });
         ui.text_field(1, r, &mut s);
         ui.end_frame();
-        frame(&mut ui, InputFrame { mouse: (20.0, 20.0), keys: vec!["Backspace".into(), "Enter".into()], ..Default::default() });
+        frame(
+            &mut ui,
+            InputFrame { mouse: (20.0, 20.0), keys: vec!["Backspace".into(), "Enter".into()], ..Default::default() },
+        );
         assert!(ui.text_field(1, r, &mut s));
         assert_eq!(s, "Playe");
     }
@@ -537,7 +580,10 @@ mod tests {
         frame(&mut ui, InputFrame { mouse: (20.0, 20.0), left_pressed: true, left_down: true, ..Default::default() });
         ui.drag_number(7, r, &mut v, 0.1, None);
         ui.end_frame();
-        frame(&mut ui, InputFrame { mouse: (40.0, 20.0), mouse_delta: (20.0, 0.0), left_down: true, ..Default::default() });
+        frame(
+            &mut ui,
+            InputFrame { mouse: (40.0, 20.0), mouse_delta: (20.0, 0.0), left_down: true, ..Default::default() },
+        );
         assert!(ui.drag_number(7, r, &mut v, 0.1, None));
         assert!((v - 3.0).abs() < 1e-4);
     }

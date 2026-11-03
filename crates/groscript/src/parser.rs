@@ -33,13 +33,7 @@ fn syntax(msg: impl Into<String>, span: Span) -> GroError {
 
 impl Parser {
     pub fn new(toks: Vec<Token>) -> Self {
-        Parser {
-            toks,
-            pos: 0,
-            errors: Vec::new(),
-            ctx: vec![Ctx::TopLevel],
-            loop_depth: 0,
-        }
+        Parser { toks, pos: 0, errors: Vec::new(), ctx: vec![Ctx::TopLevel], loop_depth: 0 }
     }
 
     fn peek(&self) -> &Tok {
@@ -80,10 +74,7 @@ impl Parser {
         if self.check(t) {
             Ok(self.advance())
         } else {
-            Err(syntax(
-                format!("expected {} but found {}", what, self.peek().describe()),
-                self.span(),
-            ))
+            Err(syntax(format!("expected {} but found {}", what, self.peek().describe()), self.span()))
         }
     }
 
@@ -101,10 +92,7 @@ impl Parser {
             }
             Tok::Eof => Ok(()),
             other => Err(syntax(
-                format!(
-                    "expected end of line but found {} (put each statement on its own line)",
-                    other.describe()
-                ),
+                format!("expected end of line but found {} (put each statement on its own line)", other.describe()),
                 self.span(),
             )),
         }
@@ -132,10 +120,7 @@ impl Parser {
             self.skip_newlines();
             if matches!(self.peek(), Tok::End | Tok::Elsif | Tok::Else) {
                 let sp = self.span();
-                self.errors.push(syntax(
-                    format!("unexpected {} with no open block", self.peek().describe()),
-                    sp,
-                ));
+                self.errors.push(syntax(format!("unexpected {} with no open block", self.peek().describe()), sp));
                 self.advance();
                 self.skip_newlines();
             }
@@ -156,10 +141,7 @@ impl Parser {
                 Tok::End | Tok::Elsif | Tok::Else => break,
                 Tok::Eof => {
                     return Err(syntax(
-                        format!(
-                            "missing 'end' for '{}' opened at line {}",
-                            opener, open_span.line
-                        ),
+                        format!("missing 'end' for '{}' opened at line {}", opener, open_span.line),
                         open_span,
                     ))
                 }
@@ -323,10 +305,7 @@ impl Parser {
                     ));
                 }
                 self.expect_line_end()?;
-                Ok(Stmt {
-                    kind: if t.tok == Tok::Break { StmtKind::Break } else { StmtKind::Next },
-                    span,
-                })
+                Ok(Stmt { kind: if t.tok == Tok::Break { StmtKind::Break } else { StmtKind::Next }, span })
             }
             _ => {
                 let e = self.expression()?;
@@ -371,20 +350,12 @@ impl Parser {
     fn function_decl(&mut self) -> PResult<Stmt> {
         let span = self.advance().span;
         if self.in_ctx() == Ctx::Function {
-            return Err(syntax(
-                "functions cannot be declared inside other functions",
-                span,
-            ));
+            return Err(syntax("functions cannot be declared inside other functions", span));
         }
         let nt = self.advance();
         let name: Rc<str> = match nt.tok {
             Tok::Ident(n) => n.into(),
-            other => {
-                return Err(syntax(
-                    format!("expected a function name but found {}", other.describe()),
-                    nt.span,
-                ))
-            }
+            other => return Err(syntax(format!("expected a function name but found {}", other.describe()), nt.span)),
         };
         self.expect(&Tok::LParen, "'(' after the function name (use () for no parameters)")?;
         let mut params: Vec<Param> = Vec::new();
@@ -430,10 +401,7 @@ impl Parser {
         self.ctx.pop();
         let body = body?;
         self.expect_end("function", span)?;
-        Ok(Stmt {
-            kind: StmtKind::Function(Rc::new(FunctionDecl { name, params, body, span })),
-            span,
-        })
+        Ok(Stmt { kind: StmtKind::Function(Rc::new(FunctionDecl { name, params, body, span })), span })
     }
 
     fn const_name(&mut self, what: &str) -> PResult<Rc<str>> {
@@ -444,21 +412,14 @@ impl Parser {
                 format!("{} names must start with an uppercase letter (try '{}')", what, capitalize(&n)),
                 t.span,
             )),
-            other => Err(syntax(
-                format!("expected a {} name but found {}", what, other.describe()),
-                t.span,
-            )),
+            other => Err(syntax(format!("expected a {} name but found {}", what, other.describe()), t.span)),
         }
     }
 
     fn class_decl(&mut self) -> PResult<Stmt> {
         let span = self.advance().span;
         let name = self.const_name("class")?;
-        let parent = if self.eat(&Tok::Lt) {
-            Some(self.const_name("class")?)
-        } else {
-            None
-        };
+        let parent = if self.eat(&Tok::Lt) { Some(self.const_name("class")?) } else { None };
         self.expect_line_end()?;
         self.ctx.push(Ctx::Class);
         let body = self.block("class", span);
@@ -498,11 +459,8 @@ impl Parser {
         };
         let op_span = self.advance().span;
         match &lhs.kind {
-            ExprKind::Ident(_)
-            | ExprKind::IVar(_)
-            | ExprKind::GVar(_)
-            | ExprKind::Member(..)
-            | ExprKind::Index(..) => {}
+            ExprKind::Ident(_) | ExprKind::IVar(_) | ExprKind::GVar(_) | ExprKind::Member(..) | ExprKind::Index(..) => {
+            }
             ExprKind::CallName(..) | ExprKind::CallMethod(..) => {
                 return Err(syntax("cannot assign to the result of a call", op_span))
             }
@@ -510,10 +468,7 @@ impl Parser {
         }
         let rhs = self.assignment()?;
         let span = lhs.span;
-        Ok(Expr {
-            kind: ExprKind::Assign(Box::new(lhs), op, Box::new(rhs)),
-            span,
-        })
+        Ok(Expr { kind: ExprKind::Assign(Box::new(lhs), op, Box::new(rhs)), span })
     }
 
     fn logical_or(&mut self) -> PResult<Expr> {
@@ -617,9 +572,7 @@ impl Parser {
         let op = match self.peek() {
             Tok::Minus => UnOp::Neg,
             Tok::Bang | Tok::Not => UnOp::Not,
-            Tok::Plus => {
-                return Err(syntax("unary '+' is not supported; just write the number", span))
-            }
+            Tok::Plus => return Err(syntax("unary '+' is not supported; just write the number", span)),
             _ => return self.power(),
         };
         self.advance();
@@ -671,10 +624,7 @@ impl Parser {
                     let span = e.span;
                     e = match e.kind {
                         ExprKind::Ident(name) => Expr { kind: ExprKind::CallName(name, args), span },
-                        ExprKind::Member(obj, name) => Expr {
-                            kind: ExprKind::CallMethod(obj, name, args),
-                            span: sp,
-                        },
+                        ExprKind::Member(obj, name) => Expr { kind: ExprKind::CallMethod(obj, name, args), span: sp },
                         _ => Expr { kind: ExprKind::CallValue(Box::new(e), args), span },
                     };
                 }
@@ -764,7 +714,10 @@ impl Parser {
                             Tok::False => Expr { kind: ExprKind::Bool(false), span: kt.span },
                             other => {
                                 return Err(syntax(
-                                    format!("expected a hash key (name, string or number) but found {}", other.describe()),
+                                    format!(
+                                        "expected a hash key (name, string or number) but found {}",
+                                        other.describe()
+                                    ),
                                     kt.span,
                                 ))
                             }

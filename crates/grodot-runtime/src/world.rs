@@ -132,8 +132,34 @@ impl InputState {
 }
 
 pub const KEY_NAMES: &[&str] = &[
-    "Space", "Enter", "Escape", "Tab", "Shift", "Ctrl", "Alt", "Backspace", "Delete", "Up", "Down", "Left", "Right",
-    "MouseLeft", "MouseRight", "MouseMiddle", "F1", "F2", "F3", "F4", "F5", "F6", "F7", "F8", "F9", "F10", "F11", "F12",
+    "Space",
+    "Enter",
+    "Escape",
+    "Tab",
+    "Shift",
+    "Ctrl",
+    "Alt",
+    "Backspace",
+    "Delete",
+    "Up",
+    "Down",
+    "Left",
+    "Right",
+    "MouseLeft",
+    "MouseRight",
+    "MouseMiddle",
+    "F1",
+    "F2",
+    "F3",
+    "F4",
+    "F5",
+    "F6",
+    "F7",
+    "F8",
+    "F9",
+    "F10",
+    "F11",
+    "F12",
 ];
 
 pub fn is_key_name(s: &str) -> bool {

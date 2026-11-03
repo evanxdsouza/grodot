@@ -169,7 +169,12 @@ pub fn draw_meshes(canvas: &mut Canvas, viewport: Rect, view: &View, light: &Lig
             let c = cverts[tri[2] as usize];
             // Trivial reject: all outside the same frustum plane.
             let out = |f: &dyn Fn(&CV) -> bool| f(&a) && f(&b) && f(&c);
-            if out(&|v| v.x > v.w) || out(&|v| v.x < -v.w) || out(&|v| v.y > v.w) || out(&|v| v.y < -v.w) || out(&|v| v.z > v.w) {
+            if out(&|v| v.x > v.w)
+                || out(&|v| v.x < -v.w)
+                || out(&|v| v.y > v.w)
+                || out(&|v| v.y < -v.w)
+                || out(&|v| v.z > v.w)
+            {
                 continue;
             }
             let poly = if a.z + a.w < NEAR_EPS || b.z + b.w < NEAR_EPS || c.z + c.w < NEAR_EPS {
@@ -203,9 +208,13 @@ pub fn draw_meshes(canvas: &mut Canvas, viewport: Rect, view: &View, light: &Lig
                     continue;
                 }
                 let min_x = t.iter().map(|v| v.x).fold(f32::INFINITY, f32::min).floor().max(viewport.x as f32) as i32;
-                let max_x = t.iter().map(|v| v.x).fold(f32::NEG_INFINITY, f32::max).ceil().min((viewport.right() - 1) as f32) as i32;
+                let max_x =
+                    t.iter().map(|v| v.x).fold(f32::NEG_INFINITY, f32::max).ceil().min((viewport.right() - 1) as f32)
+                        as i32;
                 let min_y = t.iter().map(|v| v.y).fold(f32::INFINITY, f32::min).floor().max(viewport.y as f32) as i32;
-                let max_y = t.iter().map(|v| v.y).fold(f32::NEG_INFINITY, f32::max).ceil().min((viewport.bottom() - 1) as f32) as i32;
+                let max_y =
+                    t.iter().map(|v| v.y).fold(f32::NEG_INFINITY, f32::max).ceil().min((viewport.bottom() - 1) as f32)
+                        as i32;
                 if min_x > max_x || min_y > max_y {
                     continue;
                 }
@@ -223,7 +232,7 @@ fn rasterize_parallel(canvas: &mut Canvas, viewport: Rect, tris: &[Tri]) {
         return;
     }
     let threads = std::thread::available_parallelism().map(|n| n.get()).unwrap_or(1).clamp(1, 16);
-    let band_h = ((vp.h as usize + threads - 1) / threads).max(16);
+    let band_h = (vp.h as usize).div_ceil(threads).max(16);
     // Split the colour and depth buffers into row bands starting at vp.y.
     let start = vp.y as usize * width;
     let end = vp.bottom() as usize * width;

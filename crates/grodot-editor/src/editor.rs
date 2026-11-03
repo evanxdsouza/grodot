@@ -318,7 +318,9 @@ impl Editor {
                     }
                 }
                 if self.ui.hovered_raw_viewport {
-                    for (down, key) in [(self.ui.input.left_pressed, "MouseLeft"), (self.ui.input.right_pressed, "MouseRight")] {
+                    for (down, key) in
+                        [(self.ui.input.left_pressed, "MouseLeft"), (self.ui.input.right_pressed, "MouseRight")]
+                    {
                         if down {
                             w.input.press(key);
                         }
@@ -507,7 +509,8 @@ impl Editor {
                     .and_then(|s| Scene::from_json_str(&s));
                 match r {
                     Ok(prefab) => {
-                        let roots: Vec<EntityId> = prefab.entities.iter().filter(|e| e.parent.is_none()).map(|e| e.id).collect();
+                        let roots: Vec<EntityId> =
+                            prefab.entities.iter().filter(|e| e.parent.is_none()).map(|e| e.id).collect();
                         for root in roots {
                             if let Some(id) = self.scene.instantiate(&prefab, root, None) {
                                 self.selection = Some(id);
@@ -564,7 +567,8 @@ impl Editor {
             self.fix_selection();
         } else {
             self.ui.focus = None;
-            let mut rt = Runtime::new(self.scene.clone(), Some(self.project.root.clone()), self.project.config.input.clone());
+            let mut rt =
+                Runtime::new(self.scene.clone(), Some(self.project.root.clone()), self.project.config.input.clone());
             rt.world.borrow_mut().scene_path = Some(self.scene_path.clone());
             self.log.info("Playing... (press Esc or Stop to return to the editor)");
             rt.start();
@@ -584,7 +588,11 @@ impl Editor {
                 c.next().map(|f| f.to_ascii_uppercase().to_string() + c.as_str()).unwrap_or_default()
             })
             .collect();
-        let class = if class.is_empty() || class.chars().next().unwrap().is_ascii_digit() { format!("Entity{}", id) } else { class };
+        let class = if class.is_empty() || class.chars().next().unwrap().is_ascii_digit() {
+            format!("Entity{}", id)
+        } else {
+            class
+        };
         let file: String = to_snake(&class);
         let mut rel = format!("scripts/{}.gro", file);
         let mut n = 2;
@@ -680,7 +688,8 @@ impl Editor {
         if rbtn(&mut self.ui, 50, "Grid", self.show_grid) {
             self.show_grid = !self.show_grid;
         }
-        let title = format!("{}  /  {}{}", self.project.config.name, self.scene_path, if self.dirty { " *" } else { "" });
+        let title =
+            format!("{}  /  {}{}", self.project.config.name, self.scene_path, if self.dirty { " *" } else { "" });
         let tw = self.ui.canvas.measure(&title, FontId::Ui);
         let tx = rx - tw - 16;
         if tx > play_rect.right() + 10 {
@@ -721,7 +730,13 @@ impl Editor {
             hud::draw_debug_lines(&mut self.ui.canvas, vp, &view, &w);
             hud::draw_hud(&mut self.ui.canvas, vp, &w);
             if SceneRenderer::camera_view(&w.scene, vp).is_none() {
-                self.ui.canvas.text_shadow(vp.x + 12, vp.bottom() - 52, "No active Camera in the scene - showing the editor view.", YELLOW, FontId::Ui);
+                self.ui.canvas.text_shadow(
+                    vp.x + 12,
+                    vp.bottom() - 52,
+                    "No active Camera in the scene - showing the editor view.",
+                    YELLOW,
+                    FontId::Ui,
+                );
             }
             // playing border
             self.ui.canvas.stroke_rect(vp, 0x2f8f4e);
@@ -730,7 +745,8 @@ impl Editor {
             // Camera controls
             if hovered {
                 if self.ui.input.wheel != 0.0 {
-                    self.camera.distance = (self.camera.distance * (1.0 - self.ui.input.wheel * 0.12)).clamp(0.5, 500.0);
+                    self.camera.distance =
+                        (self.camera.distance * (1.0 - self.ui.input.wheel * 0.12)).clamp(0.5, 500.0);
                 }
                 let (dx, dy) = self.ui.input.mouse_delta;
                 let pan = self.ui.input.middle_down || (self.ui.input.right_down && self.ui.input.shift);
@@ -764,7 +780,12 @@ impl Editor {
             }
             if self.scene.entities.is_empty() {
                 let r = Rect::new(vp.x, vp.y + vp.h / 2 - 30, vp.w, 60);
-                self.ui.label_centered(r, "Empty scene - click \"+ Entity\" to add a cube, camera or light.", TEXT, FontId::UiBold);
+                self.ui.label_centered(
+                    r,
+                    "Empty scene - click \"+ Entity\" to add a cube, camera or light.",
+                    TEXT,
+                    FontId::UiBold,
+                );
             }
         }
         for w in self.renderer.warnings.drain(..) {
@@ -949,8 +970,18 @@ impl Editor {
             if moved {
                 let name = scene.entity(dragged).map(|e| e.name.clone()).unwrap_or_default();
                 let (mx, my) = self.ui.input.mouse;
-                self.ui.canvas.text_shadow(mx as i32 + 12, my as i32 + 4, &format!("move '{}'", name), 0xffffff, FontId::Ui);
-                if self.ui.input.left_released && drop_target.is_none() && self.ui.hovered(list) && y < self.ui.input.mouse.1 as i32 {
+                self.ui.canvas.text_shadow(
+                    mx as i32 + 12,
+                    my as i32 + 4,
+                    &format!("move '{}'", name),
+                    0xffffff,
+                    FontId::Ui,
+                );
+                if self.ui.input.left_released
+                    && drop_target.is_none()
+                    && self.ui.hovered(list)
+                    && y < self.ui.input.mouse.1 as i32
+                {
                     drop_target = Some(None); // dropped on empty space: unparent
                 }
             }
@@ -963,7 +994,8 @@ impl Editor {
                         let world_before = scene.world_matrix(dragged);
                         match scene.set_parent(dragged, target) {
                             Ok(()) => {
-                                let parent_inv = target.map(|p| scene.world_matrix(p).inverse()).unwrap_or(Mat4::IDENTITY);
+                                let parent_inv =
+                                    target.map(|p| scene.world_matrix(p).inverse()).unwrap_or(Mat4::IDENTITY);
                                 let local = parent_inv * world_before;
                                 let t = scene.entity_mut(dragged).unwrap().transform_mut();
                                 t.position = local.get_translation();
@@ -997,8 +1029,16 @@ impl Editor {
             None => &mut self.scene,
         };
         let Some(sel) = self.selection.filter(|s| scene.entity(*s).is_some()) else {
-            self.ui.label_in(Rect::new(area.x + 14, area.y + 10, area.w - 20, 24), "Select an entity to inspect it.", TEXT_DIM);
-            self.ui.label_in(Rect::new(area.x + 14, area.y + 34, area.w - 20, 24), "Tip: click objects in the viewport.", TEXT_DIM);
+            self.ui.label_in(
+                Rect::new(area.x + 14, area.y + 10, area.w - 20, 24),
+                "Select an entity to inspect it.",
+                TEXT_DIM,
+            );
+            self.ui.label_in(
+                Rect::new(area.x + 14, area.y + 34, area.w - 20, 24),
+                "Tip: click objects in the viewport.",
+                TEXT_DIM,
+            );
             return;
         };
         let old = self.ui.canvas.clip;
@@ -1015,7 +1055,9 @@ impl Editor {
             let mut active = e.active;
             let mut tag = e.tag.clone();
             self.ui.label_in(Rect::new(x0, y, label_w, 24), "Name", TEXT_DIM);
-            if self.ui.text_field(id_of(&["name", &sid]), Rect::new(x0 + label_w, y, fw - label_w - 30, 24), &mut name) && !name.trim().is_empty() {
+            if self.ui.text_field(id_of(&["name", &sid]), Rect::new(x0 + label_w, y, fw - label_w - 30, 24), &mut name)
+                && !name.trim().is_empty()
+            {
                 scene.entity_mut(sel).unwrap().name = name.trim().to_string();
             }
             if self.ui.checkbox(Rect::new(x0 + fw - 20, y, 20, 24), &mut active) {
@@ -1030,13 +1072,8 @@ impl Editor {
             self.ui.label_in(Rect::new(x0, y, fw, 18), &format!("id {}", sel), 0x6b6f77);
             y += 24;
         }
-        let comps: Vec<(String, Vec<(&'static str, FieldValue)>)> = scene
-            .entity(sel)
-            .unwrap()
-            .components
-            .iter()
-            .map(|c| (c.type_name().to_string(), c.fields()))
-            .collect();
+        let comps: Vec<(String, Vec<(&'static str, FieldValue)>)> =
+            scene.entity(sel).unwrap().components.iter().map(|c| (c.type_name().to_string(), c.fields())).collect();
         let mut remove: Option<String> = None;
         for (cname, fields) in comps {
             let hr = Rect::new(area.x, y, area.w, 28);
@@ -1099,14 +1136,18 @@ impl Editor {
                     }
                     FieldValue::Text(t) => {
                         let mut s = t.clone();
-                        let pick = matches!((cname.as_str(), fname), ("MeshRenderer", "mesh") | ("AudioSource", "clip") | ("Script", "path"));
+                        let pick = matches!(
+                            (cname.as_str(), fname),
+                            ("MeshRenderer", "mesh") | ("AudioSource", "clip") | ("Script", "path")
+                        );
                         let tw = if pick { wr.w - 30 } else { wr.w };
                         if self.ui.text_field(fid("t"), Rect::new(wr.x, wr.y, tw, 24), &mut s) {
                             new_value = Some(FieldValue::Text(s.trim().to_string()));
                         }
                         if pick && self.ui.button(Rect::new(wr.right() - 26, wr.y, 26, 24), "...") {
                             let options = asset_options(&self.assets, &cname, fname);
-                            self.popup = Popup::AssetPicker { component: cname.clone(), field: fname.to_string(), options };
+                            self.popup =
+                                Popup::AssetPicker { component: cname.clone(), field: fname.to_string(), options };
                             self.popup_pos = (wr.x - 60, wr.bottom());
                         }
                     }
@@ -1158,7 +1199,6 @@ impl Editor {
         self.scroll_inspector = self.scroll_inspector.min((content_h - area.h).max(0));
         self.ui.canvas.clip = old;
     }
-
 }
 
 fn asset_options(assets: &[String], comp: &str, field: &str) -> Vec<String> {
@@ -1169,7 +1209,9 @@ fn asset_options(assets: &[String], comp: &str, field: &str) -> Vec<String> {
                 opts.extend(PRIMITIVE_MESHES.iter().map(|s| s.to_string()));
                 opts.extend(assets.iter().filter(|a| a.to_lowercase().ends_with(".obj")).cloned());
             }
-            ("AudioSource", "clip") => opts.extend(assets.iter().filter(|a| a.to_lowercase().ends_with(".wav")).cloned()),
+            ("AudioSource", "clip") => {
+                opts.extend(assets.iter().filter(|a| a.to_lowercase().ends_with(".wav")).cloned())
+            }
             ("Script", "path") => opts.extend(assets.iter().filter(|a| a.ends_with(".gro")).cloned()),
             _ => {}
         }
@@ -1178,7 +1220,6 @@ fn asset_options(assets: &[String], comp: &str, field: &str) -> Vec<String> {
 }
 
 impl Editor {
-
     fn draw_bottom(&mut self, r: Rect, actions: &mut Vec<Action>) {
         self.ui.panel(r, PANEL_DARK);
         self.ui.canvas.fill_rect(Rect::new(r.x, r.y, r.w, 1), BORDER);
@@ -1372,8 +1413,10 @@ impl Editor {
         match popup {
             Popup::None => {}
             Popup::AddEntity => {
-                let items: Vec<String> =
-                    ["Empty", "Cube", "Sphere", "Plane", "Cylinder", "Capsule", "Camera", "Light"].iter().map(|s| s.to_string()).collect();
+                let items: Vec<String> = ["Empty", "Cube", "Sphere", "Plane", "Cylinder", "Capsule", "Camera", "Light"]
+                    .iter()
+                    .map(|s| s.to_string())
+                    .collect();
                 match self.ui.popup_menu(px, py, "Create entity", &items) {
                     PopupResult::Chosen(i) => {
                         self.popup = Popup::None;
@@ -1422,7 +1465,11 @@ impl Editor {
                 }
             }
             Popup::AssetPicker { component, field, options } => {
-                let shown = if options.is_empty() { vec!["(no matching files in the project)".to_string()] } else { options.clone() };
+                let shown = if options.is_empty() {
+                    vec!["(no matching files in the project)".to_string()]
+                } else {
+                    options.clone()
+                };
                 match self.ui.popup_menu(px, py, &format!("Choose {}", field), &shown) {
                     PopupResult::Chosen(i) => {
                         self.popup = Popup::None;
@@ -1533,7 +1580,13 @@ pub fn create_entity(scene: &mut Scene, kind: &str, at: Vec3) -> EntityId {
                 _ => {}
             }
             e.add(col);
-            let half = if kind == "Capsule" { 1.0 } else if kind == "Plane" { 0.0 } else { 0.5 };
+            let half = if kind == "Capsule" {
+                1.0
+            } else if kind == "Plane" {
+                0.0
+            } else {
+                0.5
+            };
             e.transform_mut().position = ground + vec3(0.0, half, 0.0);
             if kind == "Plane" {
                 e.transform_mut().scale = vec3(10.0, 1.0, 10.0);

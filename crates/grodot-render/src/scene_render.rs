@@ -89,13 +89,8 @@ impl SceneRenderer {
     }
 
     pub fn lighting(scene: &Scene, view: &View) -> Lighting {
-        let mut l = Lighting::default();
-        l.ambient = scene.environment.ambient;
-        if let Some(e) = scene
-            .entities
-            .iter()
-            .find(|e| e.has("Light") && scene.is_active_in_hierarchy(e.id))
-        {
+        let mut l = Lighting { ambient: scene.environment.ambient, ..Default::default() };
+        if let Some(e) = scene.entities.iter().find(|e| e.has("Light") && scene.is_active_in_hierarchy(e.id)) {
             if let Some(Component::Light(light)) = e.get("Light") {
                 let world = scene.world_matrix(e.id);
                 l.direction = world.transform_vector(Vec3::FORWARD).normalized();
@@ -163,10 +158,8 @@ impl SceneRenderer {
                 }
             }
         }
-        let mut items: Vec<DrawItem> = meshes
-            .iter()
-            .map(|(m, model, c, lit)| DrawItem { mesh: m, model: *model, color: *c, lit: *lit })
-            .collect();
+        let mut items: Vec<DrawItem> =
+            meshes.iter().map(|(m, model, c, lit)| DrawItem { mesh: m, model: *model, color: *c, lit: *lit }).collect();
         raster::draw_meshes(canvas, viewport, view, &light, &items);
         items.clear();
         // Shadows are drawn as darkened unlit discs blended by depth test.
@@ -295,10 +288,15 @@ fn ground_height(_scene: &Scene, meshes: &[(Rc<Mesh>, Mat4, Color, bool)], p: Ve
         let wlo = model.transform_point(lo);
         let whi = model.transform_point(hi);
         let (mn, mx) = (wlo.min(whi), wlo.max(whi));
-        if p.x >= mn.x && p.x <= mx.x && p.z >= mn.z && p.z <= mx.z && mx.y <= below + 0.01 && (mx.x - mn.x) > 1.5 {
-            if best.map(|b| mx.y > b).unwrap_or(true) {
-                best = Some(mx.y);
-            }
+        if p.x >= mn.x
+            && p.x <= mx.x
+            && p.z >= mn.z
+            && p.z <= mx.z
+            && mx.y <= below + 0.01
+            && (mx.x - mn.x) > 1.5
+            && best.map(|b| mx.y > b).unwrap_or(true)
+        {
+            best = Some(mx.y);
         }
     }
     best
@@ -315,10 +313,8 @@ fn shadow_disc() -> Vec<Vec3> {
 
 fn draw_shadow(canvas: &mut Canvas, viewport: Rect, view: &View, disc: &[Vec3], model: Mat4, strength: f32) {
     // Project the disc outline and fill it with a darkening blend (scanline polygon).
-    let pd: Vec<(f32, f32, f32)> = disc
-        .iter()
-        .filter_map(|p| raster::project_depth(view, viewport, model.transform_point(*p)))
-        .collect();
+    let pd: Vec<(f32, f32, f32)> =
+        disc.iter().filter_map(|p| raster::project_depth(view, viewport, model.transform_point(*p))).collect();
     if pd.len() < disc.len() {
         return;
     }
@@ -364,14 +360,45 @@ fn draw_grid(canvas: &mut Canvas, viewport: Rect, view: &View) {
     let n = 20;
     for i in -n..=n {
         let f = i as f32;
-        let (cx, cz) = if i == 0 { (0xd04040, 0x4060e0) } else if i % 5 == 0 { (0x8a8f99, 0x8a8f99) } else { (0x6a6f78, 0x6a6f78) };
-        raster::draw_line_3d(canvas, viewport, view, Vec3 { x: -n as f32, y: 0.0, z: f }, Vec3 { x: n as f32, y: 0.0, z: f }, cx, true);
-        raster::draw_line_3d(canvas, viewport, view, Vec3 { x: f, y: 0.0, z: -n as f32 }, Vec3 { x: f, y: 0.0, z: n as f32 }, cz, true);
+        let (cx, cz) = if i == 0 {
+            (0xd04040, 0x4060e0)
+        } else if i % 5 == 0 {
+            (0x8a8f99, 0x8a8f99)
+        } else {
+            (0x6a6f78, 0x6a6f78)
+        };
+        raster::draw_line_3d(
+            canvas,
+            viewport,
+            view,
+            Vec3 { x: -n as f32, y: 0.0, z: f },
+            Vec3 { x: n as f32, y: 0.0, z: f },
+            cx,
+            true,
+        );
+        raster::draw_line_3d(
+            canvas,
+            viewport,
+            view,
+            Vec3 { x: f, y: 0.0, z: -n as f32 },
+            Vec3 { x: f, y: 0.0, z: n as f32 },
+            cz,
+            true,
+        );
     }
 }
 
 #[allow(clippy::too_many_arguments)]
-pub fn draw_box(canvas: &mut Canvas, viewport: Rect, view: &View, world: &Mat4, lo: Vec3, hi: Vec3, color: u32, depth: bool) {
+pub fn draw_box(
+    canvas: &mut Canvas,
+    viewport: Rect,
+    view: &View,
+    world: &Mat4,
+    lo: Vec3,
+    hi: Vec3,
+    color: u32,
+    depth: bool,
+) {
     let c = |x: f32, y: f32, z: f32| world.transform_point(Vec3 { x, y, z });
     let p = [
         c(lo.x, lo.y, lo.z),
@@ -441,7 +468,13 @@ mod tests {
         let mut canvas = Canvas::new(64, 48);
         let vp = canvas.full_rect();
         let view = SceneRenderer::camera_view(&s, vp).unwrap();
-        SceneRenderer::new(None).render(&mut canvas, vp, &s, &view, &RenderOptions { grid: true, ..Default::default() });
+        SceneRenderer::new(None).render(
+            &mut canvas,
+            vp,
+            &s,
+            &view,
+            &RenderOptions { grid: true, ..Default::default() },
+        );
     }
 
     #[test]

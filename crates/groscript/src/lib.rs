@@ -24,8 +24,8 @@ pub mod value;
 pub use error::{ErrorKind, GroError, GroResult, Span};
 pub use interpreter::Interpreter;
 pub use value::{
-    fmt_num, values_equal, Class, Function, GroHash, HashKey, HostObject, Module, NativeFunction, Object, Rgba,
-    Value, V2, V3,
+    fmt_num, values_equal, Class, Function, GroHash, HashKey, HostObject, Module, NativeFunction, Object, Rgba, Value,
+    V2, V3,
 };
 
 /// Check a source file for lexical and syntax errors without running it.

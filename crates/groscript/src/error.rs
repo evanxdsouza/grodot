@@ -64,14 +64,7 @@ pub struct GroError {
 
 impl GroError {
     pub fn new(kind: ErrorKind, message: impl Into<String>) -> Self {
-        GroError {
-            kind,
-            message: message.into(),
-            file: None,
-            span: None,
-            stack: Vec::new(),
-            source: None,
-        }
+        GroError { kind, message: message.into(), file: None, span: None, stack: Vec::new(), source: None }
     }
 
     pub fn at(mut self, span: Span) -> Self {
@@ -126,17 +119,8 @@ impl GroError {
                 let pad = " ".repeat(num.len());
                 out.push_str(&format!("\n  {} | {}\n", num, line));
                 let col = sp.col.saturating_sub(1) as usize;
-                let prefix: String = line
-                    .chars()
-                    .take(col)
-                    .map(|c| if c == '\t' { '\t' } else { ' ' })
-                    .collect();
-                out.push_str(&format!(
-                    "  {} | {}{}\n",
-                    pad,
-                    prefix,
-                    "^".repeat(sp.len.max(1) as usize)
-                ));
+                let prefix: String = line.chars().take(col).map(|c| if c == '\t' { '\t' } else { ' ' }).collect();
+                out.push_str(&format!("  {} | {}{}\n", pad, prefix, "^".repeat(sp.len.max(1) as usize)));
             }
         }
         if !self.stack.is_empty() {

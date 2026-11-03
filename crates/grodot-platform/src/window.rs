@@ -140,8 +140,16 @@ pub enum Event {
     Close,
     Resize(u32, u32),
     /// `key` is the engine key name (e.g. "W", "Space"); `text` is the typed character.
-    KeyDown { key: Option<String>, text: Option<String>, repeat: bool, ctrl: bool, shift: bool },
-    KeyUp { key: Option<String> },
+    KeyDown {
+        key: Option<String>,
+        text: Option<String>,
+        repeat: bool,
+        ctrl: bool,
+        shift: bool,
+    },
+    KeyUp {
+        key: Option<String>,
+    },
     MouseMove(f32, f32),
     MouseDown(MouseButton),
     MouseUp(MouseButton),
@@ -265,7 +273,8 @@ impl PlatformWindow {
                         if ev.kind() == KEY_PRESS {
                             let mut buf = [0 as c_char; 16];
                             let mut sym: c_ulong = 0;
-                            let n = (self.x.lookup_string)(&mut ev, buf.as_mut_ptr(), 15, &mut sym, std::ptr::null_mut());
+                            let n =
+                                (self.x.lookup_string)(&mut ev, buf.as_mut_ptr(), 15, &mut sym, std::ptr::null_mut());
                             let text = if n > 0 {
                                 let bytes: Vec<u8> = buf[..n as usize].iter().map(|&b| b as u8).collect();
                                 let s = String::from_utf8_lossy(&bytes).to_string();

@@ -112,10 +112,7 @@ pub struct Stmt {
 #[derive(Debug, Clone)]
 pub enum StmtKind {
     Expr(Expr),
-    If {
-        branches: Vec<(Expr, Vec<Stmt>)>,
-        else_body: Option<Vec<Stmt>>,
-    },
+    If { branches: Vec<(Expr, Vec<Stmt>)>, else_body: Option<Vec<Stmt>> },
     While(Expr, Vec<Stmt>),
     For(Rc<str>, Expr, Vec<Stmt>),
     Repeat(Expr, Vec<Stmt>),
@@ -123,14 +120,7 @@ pub enum StmtKind {
     Break,
     Next,
     Function(Rc<FunctionDecl>),
-    Class {
-        name: Rc<str>,
-        parent: Option<Rc<str>>,
-        body: Vec<Stmt>,
-    },
-    Module {
-        name: Rc<str>,
-        body: Vec<Stmt>,
-    },
+    Class { name: Rc<str>, parent: Option<Rc<str>>, body: Vec<Stmt> },
+    Module { name: Rc<str>, body: Vec<Stmt> },
     Import(String),
 }

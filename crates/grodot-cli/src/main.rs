@@ -89,7 +89,9 @@ fn run(args: Vec<String>) -> Result<ExitCode, String> {
             let dir = positional(rest).ok_or("usage: grodot new <dir> [--name \"My Game\"]")?;
             let dir = PathBuf::from(dir);
             let name = opt(rest, "--name").unwrap_or_else(|| {
-                dir.file_name().map(|n| n.to_string_lossy().replace(['-', '_'], " ")).unwrap_or_else(|| "My Game".into())
+                dir.file_name()
+                    .map(|n| n.to_string_lossy().replace(['-', '_'], " "))
+                    .unwrap_or_else(|| "My Game".into())
             });
             new_project(&dir, &name)?;
             println!("Created project '{}' in {}", name, dir.display());
@@ -101,7 +103,14 @@ fn run(args: Vec<String>) -> Result<ExitCode, String> {
             if let Some(out) = opt(rest, "--screenshot") {
                 let (w, h) = parse_size(opt(rest, "--size").as_deref().unwrap_or("1440x900"))?;
                 let frames = opt(rest, "--play-frames").map(|s| s.parse().unwrap_or(0)).unwrap_or(0);
-                grodot_editor::editor_screenshot(&dir, Path::new(&out), w, h, opt(rest, "--select").as_deref(), frames)?;
+                grodot_editor::editor_screenshot(
+                    &dir,
+                    Path::new(&out),
+                    w,
+                    h,
+                    opt(rest, "--select").as_deref(),
+                    frames,
+                )?;
                 println!("Saved {}", out);
                 return Ok(ExitCode::SUCCESS);
             }
@@ -112,9 +121,13 @@ fn run(args: Vec<String>) -> Result<ExitCode, String> {
             let dir = project_dir(rest);
             let project = Project::open(&dir)?;
             if flag(rest, "--headless") {
-                let frames = opt(rest, "--frames").map(|s| s.parse().map_err(|_| "--frames needs a number")).transpose()?.unwrap_or(300);
+                let frames = opt(rest, "--frames")
+                    .map(|s| s.parse().map_err(|_| "--frames needs a number"))
+                    .transpose()?
+                    .unwrap_or(300);
                 let shot = opt(rest, "--screenshot").map(PathBuf::from);
-                let errors = grodot_editor::player::run_headless(&project, frames, shot.as_deref(), flag(rest, "--verbose"))?;
+                let errors =
+                    grodot_editor::player::run_headless(&project, frames, shot.as_deref(), flag(rest, "--verbose"))?;
                 if errors > 0 {
                     eprintln!("{} script error(s) while running {} frames", errors, frames);
                     return Ok(ExitCode::from(1));
@@ -240,7 +253,10 @@ fn check_project(dir: &Path) -> Result<usize, String> {
     }
     for sp in &scenes {
         let rel = sp.strip_prefix(&project.root).unwrap_or(sp).display().to_string();
-        let scene = match std::fs::read_to_string(sp).map_err(|e| e.to_string()).and_then(|s| grodot_core::Scene::from_json_str(&s)) {
+        let scene = match std::fs::read_to_string(sp)
+            .map_err(|e| e.to_string())
+            .and_then(|s| grodot_core::Scene::from_json_str(&s))
+        {
             Ok(s) => s,
             Err(e) => {
                 report(format!("{}: {}", rel, e));
@@ -359,7 +375,10 @@ fn indent(s: &str) -> String {
 
 fn repl() {
     use std::io::{BufRead, Write};
-    println!("Groscript {} - type code and press Enter. Blocks continue until 'end'. Ctrl+D to exit.", grodot_core::VERSION);
+    println!(
+        "Groscript {} - type code and press Enter. Blocks continue until 'end'. Ctrl+D to exit.",
+        grodot_core::VERSION
+    );
     let mut it = groscript::Interpreter::new();
     let stdin = std::io::stdin();
     let mut buf = String::new();
@@ -374,7 +393,10 @@ fn repl() {
         buf.push_str(&line);
         // Keep reading while a block is still open.
         let errs = groscript::check(&buf);
-        if errs.iter().any(|e| e.message.starts_with("missing 'end'") || e.message.contains("unterminated interpolation")) {
+        if errs
+            .iter()
+            .any(|e| e.message.starts_with("missing 'end'") || e.message.contains("unterminated interpolation"))
+        {
             continue;
         }
         let src = std::mem::take(&mut buf);

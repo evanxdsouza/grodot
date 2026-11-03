@@ -78,7 +78,8 @@ fn syntax_errors_and_missing_classes_are_reported() {
     let p = TempProject::new("syntax");
     p.write("scripts/broken.gro", "class Broken < Entity\n  function ready()\n    x = (1 +\n  end\nend\n");
     p.write("scripts/noclass.gro", "x = 1\n");
-    let scene = scene_with_scripts(&[("A", "scripts/broken.gro"), ("B", "scripts/noclass.gro"), ("C", "scripts/missing.gro")]);
+    let scene =
+        scene_with_scripts(&[("A", "scripts/broken.gro"), ("B", "scripts/noclass.gro"), ("C", "scripts/missing.gro")]);
     let mut rt = Runtime::new(scene, Some(p.root.clone()), Default::default());
     rt.frame(0.016);
     let errs = errors(&rt).join("\n");
@@ -91,8 +92,12 @@ fn syntax_errors_and_missing_classes_are_reported() {
 #[test]
 fn infinite_loop_is_stopped_by_budget() {
     let p = TempProject::new("budget");
-    p.write("scripts/loop.gro", "class Loop < Entity\n  function update(delta)\n    while true\n      x = 1\n    end\n  end\nend\n");
-    let mut rt = Runtime::new(scene_with_scripts(&[("L", "scripts/loop.gro")]), Some(p.root.clone()), Default::default());
+    p.write(
+        "scripts/loop.gro",
+        "class Loop < Entity\n  function update(delta)\n    while true\n      x = 1\n    end\n  end\nend\n",
+    );
+    let mut rt =
+        Runtime::new(scene_with_scripts(&[("L", "scripts/loop.gro")]), Some(p.root.clone()), Default::default());
     rt.frame(0.016);
     assert!(errors(&rt)[0].contains("execution budget exceeded"));
     rt.frame(0.016); // and the game keeps running
@@ -143,7 +148,11 @@ class Spawner < Entity
 end
 "#,
     );
-    let mut rt = Runtime::new(scene_with_scripts(&[("Spawner", "scripts/spawner.gro")]), Some(p.root.clone()), Default::default());
+    let mut rt = Runtime::new(
+        scene_with_scripts(&[("Spawner", "scripts/spawner.gro")]),
+        Some(p.root.clone()),
+        Default::default(),
+    );
     for _ in 0..20 {
         rt.frame(0.01);
     }
