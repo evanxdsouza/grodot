@@ -1,0 +1,22 @@
+# Hour 7: the shape of a game script.
+# In a real project this class extends Entity and the engine calls the
+# lifecycle methods. Here we call them ourselves to see the order.
+class Spinner
+  SPEED = 90
+
+  function ready()
+    @angle = 0
+    print("ready")
+  end
+
+  function update(delta)
+    @angle += SPEED * delta
+  end
+end
+
+spinner = Spinner.new()
+spinner.ready()
+repeat 60 times
+  spinner.update(1 / 60)
+end
+print("turned #{Math.round(spinner.angle)} degrees in one second")

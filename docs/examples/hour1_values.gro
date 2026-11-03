@@ -1,0 +1,17 @@
+# Hour 1: values, variables and printing
+name = "Ada"
+level = 3
+health = 87.5
+alive = true
+weapon = nil
+
+print("Hello,", name)
+print("Level", level, "with", health, "HP")
+print("Next level in #{100 - health} points")
+print(type(level), type(name), type(alive), type(weapon))
+
+# Numbers are all the same type
+print(7 / 2, 7 % 2, 2 ** 8)
+
+# Only false and nil are "falsey"
+print(not 0, not "", not nil)

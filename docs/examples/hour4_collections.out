@@ -1,0 +1,10 @@
+["sword", "potion", "map"] 3
+sword map
+true
+- sword
+- potion
+- map
+120 300
+[:sword, :potion, "magic map", :shield]
+Total: 515
+[3, 5, 9] b, a

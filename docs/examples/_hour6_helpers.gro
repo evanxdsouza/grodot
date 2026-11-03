@@ -1,0 +1,12 @@
+# A module in its own file, imported by hour6_modules.gro
+module Dice
+  SIDES = 6
+
+  function roll(count)
+    total = 0
+    repeat count times
+      total += Math.random_int(1, SIDES)
+    end
+    return total
+  end
+end

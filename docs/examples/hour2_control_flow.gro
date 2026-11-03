@@ -1,0 +1,28 @@
+# Hour 2: making decisions and repeating things
+score = 72
+
+if score >= 90
+  print("Gold medal")
+elsif score >= 70
+  print("Silver medal")
+else
+  print("Keep practising")
+end
+
+countdown = 3
+while countdown > 0
+  print("#{countdown}...")
+  countdown -= 1
+end
+print("Go!")
+
+repeat 2 times
+  print("jump")
+end
+
+for i in range(1, 6)
+  if i == 3
+    next
+  end
+  print("lap", i)
+end

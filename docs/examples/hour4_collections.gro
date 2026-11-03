@@ -1,0 +1,22 @@
+# Hour 4: arrays and hashes
+inventory = ["sword", "potion"]
+inventory.push("map")
+print(inventory, inventory.length())
+print(inventory[0], inventory[-1])
+print(inventory.contains?("potion"))
+
+for item in inventory
+  print("- #{item}")
+end
+
+prices = {sword: 120, potion: 15, "magic map": 300}
+print(prices[:sword], prices["magic map"])
+prices[:shield] = 80
+print(prices.keys())
+
+total = 0
+for key in prices
+  total += prices[key]
+end
+print("Total: #{total}")
+print([5, 3, 9].sort(), ["b", "a"].join(", "))

@@ -254,6 +254,11 @@ impl std::fmt::Debug for Value {
     }
 }
 
+/// Format a vector/colour component: rounded to 4 decimals so f32 noise does not show.
+pub fn fmt_component(n: f64) -> String {
+    fmt_num((n * 10000.0).round() / 10000.0 + 0.0)
+}
+
 pub fn fmt_num(n: f64) -> String {
     if n.is_nan() {
         "nan".into()
@@ -448,13 +453,20 @@ impl Value {
                 out.push('>');
             }
             Value::Vec2(v) => {
-                let _ = write!(out, "Vector2({}, {})", fmt_num(v.x), fmt_num(v.y));
+                let _ = write!(out, "Vector2({}, {})", fmt_component(v.x), fmt_component(v.y));
             }
             Value::Vec3(v) => {
-                let _ = write!(out, "Vector3({}, {}, {})", fmt_num(v.x), fmt_num(v.y), fmt_num(v.z));
+                let _ = write!(out, "Vector3({}, {}, {})", fmt_component(v.x), fmt_component(v.y), fmt_component(v.z));
             }
             Value::Color(c) => {
-                let _ = write!(out, "Color({}, {}, {}, {})", fmt_num(c.r), fmt_num(c.g), fmt_num(c.b), fmt_num(c.a));
+                let _ = write!(
+                    out,
+                    "Color({}, {}, {}, {})",
+                    fmt_component(c.r),
+                    fmt_component(c.g),
+                    fmt_component(c.b),
+                    fmt_component(c.a)
+                );
             }
             Value::Host(h) => out.push_str(&h.describe()),
         }

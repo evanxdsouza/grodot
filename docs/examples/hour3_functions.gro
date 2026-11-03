@@ -1,0 +1,28 @@
+# Hour 3: functions
+function damage(base, multiplier = 1)
+  return base * multiplier
+end
+
+function is_critical?(roll)
+  return roll >= 18
+end
+
+print(damage(10))
+print(damage(10, 2.5))
+print(is_critical?(19), is_critical?(4))
+
+# A function without 'return' gives back nil
+function shout(text)
+  print(text.upcase() + "!")
+end
+result = shout("level up")
+print(result)
+
+# Functions are values: pass them around by name
+function twice(f, x)
+  return f(f(x))
+end
+function add_ten(n)
+  return n + 10
+end
+print(twice(add_ten, 1))

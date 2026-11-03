@@ -1,0 +1,93 @@
+# Design decisions
+
+Accepted choices and their rationale. Newest first within each section.
+
+## Platform and dependencies
+
+**D1. Zero third-party crates.** The blueprint recommended wgpu, winit, egui,
+Rapier3D, Kira, glam, serde and clap. The build environment for v0.1 had no
+access to crates.io, so every subsystem was written against the Rust standard
+library only. This turned out to suit the project's goals:
+
+* `cargo build` needs no system `-dev` packages, no C compiler and no network.
+* The whole engine is small enough for one person (or one coding agent) to read.
+* Rendering, physics and the full game loop run headless in CI.
+
+Consequences and mitigations:
+
+| Blueprint choice | v0.1 replacement | Notes |
+| --- | --- | --- |
+| wgpu | `grodot-render`: multithreaded software rasterizer | ~60 fps for jam-sized scenes at 1280x720. A GPU backend can implement the same `SceneRenderer` contract later. |
+| winit | `grodot-platform::window`: X11 via `dlopen("libX11.so.6")` | Works on X11 and on Wayland through XWayland. |
+| egui + egui_dock | `grodot-editor::ui`: immediate-mode widgets on the canvas | Fixed dock layout (hierarchy, viewport, inspector, console/assets). |
+| Rapier3D | `grodot-runtime::physics`: boxes and spheres, fixed step | Rotation is not simulated. Enough for platformers and pickups. |
+| Kira | `grodot-platform::audio`: WAV decoder + mixer over ALSA via `dlopen` | PipeWire and PulseAudio expose ALSA; missing audio is a warning. |
+| glam | `grodot-core::math` | Vec3, Quat, Mat4, Color with tests. |
+| serde + RON/JSON | `grodot-core::json` | Hand-written reader/writer that keeps key order. |
+| clap | hand-written argument parsing | Eight commands. |
+| gltf | Wavefront `.obj` loader plus primitives | Matches cut-order item 3. glTF is on the roadmap. |
+
+**D2. Linux x86_64 only.** OS access sits behind `grodot-platform`. No Windows
+or macOS code paths exist.
+
+**D3. Libraries are loaded at runtime.** Because X11 and ALSA are `dlopen`ed,
+the same binary starts on machines without a display or sound card. Headless
+commands (`run --headless`, `check`, `test`, `script`) never touch them.
+
+## Scene and project
+
+**D4. Scene format: JSON** (`.gscene`, `.gprefab`), versioned with
+`scene_version` (currently 1). Files newer than the engine are rejected.
+Rotations are stored as quaternions `[x, y, z, w]`; `rotation_degrees` is also
+accepted when hand-writing files. Asset paths are always project-relative.
+
+**D5. ECS strategy: a simple entity list.** Entities hold a `Vec<Component>`
+with at most one component per type. No archetypes or systems; scripts are the
+behaviour layer.
+
+**D6. Coordinates:** right-handed, +Y up, -Z forward, 1 unit = 1 metre,
+Euler angles in degrees applied yaw (Y), pitch (X), roll (Z).
+
+**D7. Play mode runs on a clone** of the editor scene. Stop discards runtime
+changes. The inspector edits the live copy while playing.
+
+**D8. Paths are project-scoped.** Scripts and the engine reject absolute paths
+and `..` components for assets, scenes, prefabs and imports.
+
+## Groscript
+
+Answers to blueprint section 18.3:
+
+| Question | Decision |
+| --- | --- |
+| Are functions first-class? | Named functions are values (`f = add; f(1, 2)`). No anonymous functions or closures in v0.1. Timers take a function value or a `:method` symbol. |
+| Parentheses on calls? | Always required, even with zero arguments. No parentheses means a property. |
+| Property and index assignment? | Yes: `player.hp = 5`, `items[0] = x`, `h[:k] = v`. |
+| Return value without `return`? | `nil`. No implicit return. |
+| Are strings immutable? | Yes. |
+| Legal hash keys? | nil, booleans, numbers, strings, symbols. |
+| How do modules expose definitions? | `module M` members are accessed as `M.f()` / `M.CONST`. Imports run a file once and make its classes, modules and functions global. |
+| Script callback errors? | Reported with location and stack, then that script instance is disabled. |
+| Create entities at runtime? | Yes: `Scene.spawn(prefab)`, `Scene.create(name)`, `entity.duplicate()`, `add_component()`. Attaching scripts at runtime is limited to prefabs. |
+| Destroyed entity handles? | `entity.valid?()` returns false; any other use is an EngineError naming the entity. Destruction is deferred to the end of the frame. |
+
+Other language choices:
+
+* **Truthiness** follows Ruby: only `false` and `nil` are falsey.
+* **One Number type** (f64). Integral numbers print without `.0`.
+* **Object fields are public** (`obj.hp` reads `@hp`). This removes the need
+  for getters in a beginner's first day.
+* **Chained comparisons are rejected** rather than given a surprising meaning.
+* **Constants resolve through the receiver's class first**, so a subclass can
+  override a constant used by an inherited method.
+* **Vectors and colours are immutable values**: `pos.x = 1` is an error with a
+  hint to use `with_x`.
+* **Execution budget** of 5,000,000 statements per engine callback.
+
+## Editor
+
+**D9. Undo is snapshot-based.** The editor compares the scene each frame and
+records a snapshot when an edit finishes (not during a drag). 100 levels.
+
+**D10. Scripts are edited in the user's own editor.** The Script inspector and
+the console open files with `$VISUAL` (with `+line`) or `xdg-open`.

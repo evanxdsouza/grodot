@@ -1,0 +1,17 @@
+# Hour 6: modules, imports and errors
+import "_hour6_helpers"
+
+Math.seed(7)
+result = Dice.roll(3)
+print("Rolled", result, "with", Dice.SIDES, "sided dice")
+print(result >= 3 and result <= 18)
+
+# Strings, vectors and colours are values you can build on
+spawn = Vector3.new(0, 1, 0)
+target = spawn + Vector3.new(3, 0, 4)
+print(spawn.distance_to(target))
+print(target.with_y(0), Color.hex("#ffd23f"))
+
+# assert() stops the program with a clear message when something is wrong
+assert(result > 0, "dice must roll at least 1")
+print("all good")

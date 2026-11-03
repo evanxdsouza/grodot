@@ -1,0 +1,37 @@
+# Hour 5: classes and objects
+class Monster
+  MAX_HP = 30
+
+  function initialize(name)
+    @name = name
+    @hp = MAX_HP
+  end
+
+  function hit(amount)
+    @hp = Math.max(@hp - amount, 0)
+    if @hp == 0
+      print("#{@name} is defeated")
+    end
+  end
+
+  function describe()
+    return "#{@name} (#{@hp}/#{MAX_HP} HP)"
+  end
+end
+
+class Boss < Monster
+  MAX_HP = 100
+
+  function hit(amount)
+    super(amount / 2)
+  end
+end
+
+slime = Monster.new("Slime")
+dragon = Boss.new("Dragon")
+slime.hit(12)
+dragon.hit(40)
+print(slime.describe())
+print(dragon.describe())
+print(dragon.hp, dragon.is_a?(Monster))
+slime.hit(50)

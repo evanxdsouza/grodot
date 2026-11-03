@@ -1,0 +1,50 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  linux:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - name: Format
+        run: cargo fmt --all --check
+      - name: Clippy
+        run: cargo clippy --all-targets -- -D warnings
+      - name: Tests
+        run: cargo test --all
+      - name: Release build
+        run: cargo build --release
+      - name: Groscript tests
+        run: |
+          ./target/release/grodot test tests/language
+          ./target/release/grodot test docs/examples
+      - name: Check and play the sample game headlessly
+        run: |
+          ./target/release/grodot check examples/orb-garden
+          ./target/release/grodot run examples/orb-garden --headless --frames 600 --screenshot game.png
+      - name: Create, check and run a new project
+        run: |
+          ./target/release/grodot new /tmp/ci-game --name "CI Game"
+          ./target/release/grodot check /tmp/ci-game
+          ./target/release/grodot run /tmp/ci-game --headless --frames 120
+      - name: Window smoke test (Xvfb)
+        run: |
+          sudo apt-get update && sudo apt-get install -y xvfb
+          Xvfb :99 -screen 0 1440x900x24 &
+          sleep 1
+          DISPLAY=:99 timeout 5 ./target/release/grodot open examples/orb-garden || test $? -eq 124
+          DISPLAY=:99 timeout 5 ./target/release/grodot run examples/orb-garden || test $? -eq 124
+      - name: Package
+        run: ./target/release/grodot package examples/orb-garden --out dist
+      - uses: actions/upload-artifact@v4
+        with:
+          name: orb-garden-linux
+          path: |
+            dist/*.tar.gz
+            game.png
