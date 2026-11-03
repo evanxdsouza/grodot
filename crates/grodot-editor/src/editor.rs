@@ -1429,9 +1429,9 @@ impl Editor {
                     "Empty", "Cube", "Sphere", "Plane", "Cylinder", "Capsule", "Camera", "Light", "Sprite2D",
                     "Camera2D",
                 ]
-                    .iter()
-                    .map(|s| s.to_string())
-                    .collect();
+                .iter()
+                .map(|s| s.to_string())
+                .collect();
                 match self.ui.popup_menu(px, py, "Create entity", &items) {
                     PopupResult::Chosen(i) => {
                         self.popup = Popup::None;
