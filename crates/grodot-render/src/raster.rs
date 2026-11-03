@@ -163,7 +163,8 @@ pub fn draw_meshes(canvas: &mut Canvas, viewport: Rect, view: &View, light: &Lig
             let c = mvp.transform4(*p);
             cverts.push(CV { x: c.x, y: c.y, z: c.z, w: c.w, r, g, b });
         }
-        for tri in item.mesh.indices.chunks_exact(3) {
+        let (triangles, _) = item.mesh.indices.as_chunks::<3>();
+        for tri in triangles {
             let a = cverts[tri[0] as usize];
             let b = cverts[tri[1] as usize];
             let c = cverts[tri[2] as usize];
