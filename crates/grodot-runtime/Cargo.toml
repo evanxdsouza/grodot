@@ -1,0 +1,9 @@
+[package]
+name = "grodot-runtime"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+grodot-core = { path = "../grodot-core" }
+groscript = { path = "../groscript" }

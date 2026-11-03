@@ -1,0 +1,4 @@
+function broken()
+  if true
+    print("x")
+end

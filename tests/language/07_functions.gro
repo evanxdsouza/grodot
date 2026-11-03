@@ -1,0 +1,40 @@
+function add(a, b)
+  return a + b
+end
+
+function greet(name, greeting = "Hello")
+  return "#{greeting}, #{name}!"
+end
+
+function no_return()
+  x = 1
+end
+
+function fib(n)
+  if n < 2
+    return n
+  end
+  return fib(n - 1) + fib(n - 2)
+end
+
+function empty?(list)
+  return list.length() == 0
+end
+
+print(add(2, 3))
+print(greet("Ada"), greet("Bob", "Hi"))
+print(no_return())
+print(fib(15))
+print(empty?([]))
+
+# Functions are values
+op = add
+print(op(10, 20), op.call(1, 1))
+function apply(f, x)
+  return f(x)
+end
+function double(x)
+  return x * 2
+end
+print(apply(double, 21))
+print([double, add].length())

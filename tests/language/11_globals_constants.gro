@@ -1,0 +1,15 @@
+$score = 0
+MAX_SCORE = 3
+
+function add_point()
+  $score += 1
+  if $score >= MAX_SCORE
+    return "win"
+  end
+  return "keep going"
+end
+
+print(add_point())
+print(add_point())
+print(add_point())
+print($score, $never_set)

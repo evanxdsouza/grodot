@@ -1,0 +1,7 @@
+# A helper module used by 09_modules.gro
+module MathHelpers
+  function clamp(value, minimum, maximum)
+    return Math.max(minimum, Math.min(value, maximum))
+  end
+end
+print("helpers loaded")

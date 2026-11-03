@@ -1,0 +1,12 @@
+Groscript Error: RuntimeError
+File: 15_division_by_zero_error.gro
+Line: 2
+Column: 7
+
+division by zero
+
+  2 | print(1 / x)
+    |       ^
+
+Call stack:
+  <main> (15_division_by_zero_error.gro)

@@ -1,0 +1,27 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/groscript",
+    "crates/grodot-core",
+    "crates/grodot-render",
+    "crates/grodot-platform",
+    "crates/grodot-runtime",
+    "crates/grodot-editor",
+    "crates/grodot-cli",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+repository = "https://github.com/evanxdsouza/grodot"
+
+[profile.dev]
+opt-level = 1
+
+[profile.dev.package."*"]
+opt-level = 2
+
+[profile.release]
+opt-level = 3
+debug = false

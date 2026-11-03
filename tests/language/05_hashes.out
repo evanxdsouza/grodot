@@ -1,0 +1,12 @@
+{ name: "Ada", hp: 10, "title": "Hero" }
+Ada Hero nil
+7 4
+[:name, :hp, "title", :level]
+["Ada", 7, "Hero", 2]
+true false
+2 3
+0
+{ "a": 2, "b": 1 }
+a 2
+b 1
+true true

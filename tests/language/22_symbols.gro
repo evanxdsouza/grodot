@@ -1,0 +1,7 @@
+state = :idle
+if state == :idle
+  print("idle!")
+end
+print(:a == :a, :a == "a", state)
+lookup = {idle: "standing", run: "running"}
+print(lookup[state])

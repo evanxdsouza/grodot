@@ -1,0 +1,20 @@
+player = {name: "Ada", hp: 10, "title": "Hero"}
+print(player)
+print(player[:name], player["title"], player[:missing])
+player[:hp] -= 3
+player[:level] = 2
+print(player[:hp], player.length())
+print(player.keys())
+print(player.values())
+print(player.contains?(:level), player.contains?("level"))
+print(player.remove(:level), player.length())
+print(player.get(:mana, 0))
+counts = {}
+for w in ["a", "b", "a"]
+  counts[w] = counts.get(w, 0) + 1
+end
+print(counts)
+for k in counts
+  print(k, counts[k])
+end
+print({a: 1} == {a: 1}, {}.empty?())

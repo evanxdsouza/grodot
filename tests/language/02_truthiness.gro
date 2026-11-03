@@ -1,0 +1,12 @@
+# Only false and nil are falsey
+for v in [0, 0.0, "", [], {}, false, nil, :a]
+  if v
+    print("#{inspect(v)} is truthy")
+  else
+    print("#{inspect(v)} is falsey")
+  end
+end
+print(nil or "default")
+print(false and boom())
+print(1 and 2)
+print(not true, !nil)

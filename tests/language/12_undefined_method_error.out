@@ -1,0 +1,13 @@
+Groscript Error: NameError
+File: 12_undefined_method_error.gro
+Line: 3
+Column: 5
+
+undefined function 'jump_now'
+
+  3 |     jump_now()
+    |     ^^^^^^^^
+
+Call stack:
+  Player.update
+  <main> (12_undefined_method_error.gro)

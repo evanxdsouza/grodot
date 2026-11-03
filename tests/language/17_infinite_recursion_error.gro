@@ -1,0 +1,4 @@
+function forever(n)
+  return forever(n + 1)
+end
+forever(0)

@@ -1,0 +1,20 @@
+items = [3, 1, 2]
+items.push(5)
+print(items, items.length())
+print(items.pop(), items)
+print(items.sort(), items)
+print(items.first(), items.last(), items[1], items[-1], items[10])
+items[0] = 9
+print(items)
+print(items.contains?(9), items.contains?(4))
+print(items.remove(1), items)
+print(items.remove_at(0), items)
+print(items.reverse(), [].empty?())
+print([1, 2] + [3], ["a", "b"].join("-"))
+print([1, 2, 3].sum(), [1, 2, 3].index_of(3))
+nested = [[1, 2], [3, [4]]]
+print(nested[1][1][0])
+print([1, [2]] == [1, [2]], [1] == [2])
+words = ["pear", "apple", "fig"]
+print(words.sort())
+print(items.clear())

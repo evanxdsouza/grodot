@@ -1,0 +1,15 @@
+# Functions do not see the caller's local variables.
+counter = 10
+function show()
+  counter = 1
+  return counter
+end
+print(show(), counter)
+# Locals live for the whole function, not just the block.
+function block_scope()
+  if true
+    inner = "visible"
+  end
+  return inner
+end
+print(block_scope())

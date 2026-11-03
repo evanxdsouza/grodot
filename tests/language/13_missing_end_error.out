@@ -1,0 +1,9 @@
+Groscript Error: SyntaxError
+File: 13_missing_end_error.gro
+Line: 1
+Column: 1
+
+missing 'end' for 'function' opened at line 1
+
+  1 | function broken()
+    | ^^^^^^^^

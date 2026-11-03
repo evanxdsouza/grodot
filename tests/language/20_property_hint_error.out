@@ -1,0 +1,12 @@
+Groscript Error: TypeError
+File: 20_property_hint_error.gro
+Line: 2
+Column: 13
+
+'length' is a method; call it with length()
+
+  2 | print(items.length)
+    |             ^^^^^^
+
+Call stack:
+  <main> (20_property_hint_error.gro)

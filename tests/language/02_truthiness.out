@@ -1,0 +1,12 @@
+0 is truthy
+0 is truthy
+"" is truthy
+[] is truthy
+{} is truthy
+false is falsey
+nil is falsey
+:a is truthy
+default
+false
+2
+false true

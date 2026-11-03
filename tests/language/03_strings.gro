@@ -1,0 +1,16 @@
+name = "Grodot"
+print("Hello, #{name}!")
+print("2 + 2 = #{2 + 2}")
+print("nested: #{"in" + "ner"}")
+s = "  Mixed Case  "
+print(s.trim().upcase(), s.trim().downcase())
+print("hello".length(), "".empty?())
+print("game.gro".ends_with?(".gro"), "game".starts_with?("ga"), "team".contains?("ea"))
+print("a,b,c".split(","))
+print("one two  three".split())
+print("cat".replace("c", "b"))
+print("abc"[0], "abc"[-1], "abc"[5])
+print("tab\tand\\slash")
+print("score: " + str(10))
+print(num("3.5") + 1, num("nope"))
+print("abc".reverse(), "hello".capitalize())

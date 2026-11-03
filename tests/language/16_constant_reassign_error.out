@@ -1,0 +1,12 @@
+Groscript Error: NameError
+File: 16_constant_reassign_error.gro
+Line: 2
+Column: 1
+
+cannot reassign constant 'SPEED'
+
+  2 | SPEED = 6
+    | ^^^^^
+
+Call stack:
+  <main> (16_constant_reassign_error.gro)

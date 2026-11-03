@@ -1,0 +1,8 @@
+class Player
+  function update(delta)
+    jump_now()
+  end
+end
+
+p = Player.new()
+p.update(0.016)

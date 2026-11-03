@@ -1,0 +1,12 @@
+Groscript Error: TypeError
+File: 14_type_error.gro
+Line: 2
+Column: 7
+
+cannot use '+' with String and Number (use interpolation like "score: #{score}" or str(value))
+
+  2 | print("Score: " + score)
+    |       ^^^^^^^^^
+
+Call stack:
+  <main> (14_type_error.gro)

@@ -1,0 +1,31 @@
+score = 75
+if score >= 90
+  print("A")
+elsif score >= 70
+  print("B")
+else
+  print("C")
+end
+i = 0
+while i < 3
+  i += 1
+end
+print(i)
+for n in range(10)
+  if n == 2
+    next
+  end
+  if n == 5
+    break
+  end
+  print(n)
+end
+total = 0
+repeat 4 times
+  total += 10
+end
+print(total)
+print(range(2, 8, 2))
+for c in "hey"
+  print(c)
+end

@@ -1,0 +1,41 @@
+class Animal
+  LEGS = 4
+
+  function initialize(name)
+    @name = name
+    @energy = 10
+  end
+
+  function speak()
+    return "..."
+  end
+
+  function describe()
+    return "#{@name} says #{speak()} (#{LEGS} legs)"
+  end
+end
+
+class Bird < Animal
+  LEGS = 2
+
+  function initialize(name)
+    super(name)
+    @can_fly = true
+  end
+
+  function speak()
+    return "tweet"
+  end
+end
+
+a = Animal.new("Generic")
+b = Bird.new("Robin")
+print(a.describe())
+print(b.describe())
+print(b.name, b.can_fly)
+b.energy -= 3
+print(b.energy)
+print(b.is_a?(Animal), a.is_a?(Bird), Bird.LEGS)
+print(type(b))
+other = b
+print(other == b, Bird.new("x") == Bird.new("x"))

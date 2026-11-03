@@ -1,0 +1,12 @@
+[package]
+name = "grodot-editor"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+grodot-core = { path = "../grodot-core" }
+grodot-render = { path = "../grodot-render" }
+grodot-platform = { path = "../grodot-platform" }
+grodot-runtime = { path = "../grodot-runtime" }
+groscript = { path = "../groscript" }

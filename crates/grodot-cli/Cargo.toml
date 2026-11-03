@@ -1,0 +1,17 @@
+[package]
+name = "grodot-cli"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "grodot"
+path = "src/main.rs"
+
+[dependencies]
+grodot-core = { path = "../grodot-core" }
+grodot-render = { path = "../grodot-render" }
+grodot-platform = { path = "../grodot-platform" }
+grodot-runtime = { path = "../grodot-runtime" }
+grodot-editor = { path = "../grodot-editor" }
+groscript = { path = "../groscript" }

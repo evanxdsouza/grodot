@@ -1,0 +1,13 @@
+Groscript Error: RuntimeError
+File: 17_infinite_recursion_error.gro
+Line: 2
+Column: 10
+
+stack overflow: too much recursion in forever()
+
+  2 |   return forever(n + 1)
+    |          ^^^^^^^
+
+Call stack:
+  forever (repeated 199 times)
+  <main> (17_infinite_recursion_error.gro)

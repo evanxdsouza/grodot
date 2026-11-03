@@ -1,0 +1,19 @@
+import "_helpers"
+
+module Geometry
+  UNIT = 1
+
+  function square(x)
+    return x * x
+  end
+
+  function area(w, h)
+    return square(w) * h * UNIT
+  end
+end
+
+print(Geometry.area(3, 2), Geometry.UNIT)
+print(MathHelpers.clamp(12, 0, 10))
+print(MathHelpers.clamp(-1, 0, 10))
+import "_helpers"
+print("imported once")
