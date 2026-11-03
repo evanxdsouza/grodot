@@ -18,7 +18,8 @@ COMMANDS:
     run [dir]                       Play the game in a window
         --headless --frames N         Run without a window (CI smoke test)
         --screenshot out.png          With --headless, save the last frame
-    check [dir]                     Validate grodot.toml, scenes, scripts and assets
+    check [dir | file.gro]          Validate a project (config, scenes, scripts, assets)
+                                    or check one script's syntax
     script <file.gro>               Run a standalone Groscript file
     repl                            Interactive Groscript prompt
     test [dir]                      Run Groscript tests (*.gro, compared with *.out)
@@ -140,6 +141,20 @@ fn run(args: Vec<String>) -> Result<ExitCode, String> {
         }
         "check" => {
             let dir = project_dir(rest);
+            if dir.extension().map(|e| e == "gro").unwrap_or(false) {
+                let src = std::fs::read_to_string(&dir).map_err(|e| format!("{}: {}", dir.display(), e))?;
+                let errors = groscript::check(&src);
+                for mut e in errors.clone() {
+                    e.file = Some(dir.display().to_string().as_str().into());
+                    e.source = Some(src.as_str().into());
+                    eprint!("{}", e.report());
+                }
+                if errors.is_empty() {
+                    println!("OK: {} has no syntax errors.", dir.display());
+                    return Ok(ExitCode::SUCCESS);
+                }
+                return Ok(ExitCode::from(1));
+            }
             let problems = check_project(&dir)?;
             if problems == 0 {
                 println!("OK: no problems found.");

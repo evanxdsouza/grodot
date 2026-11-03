@@ -1,0 +1,417 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Grodot</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<meta name="description" content="Grodot is a Linux-first 3D game engine with a visual editor and Groscript, a scripting language you can learn in a day.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=IBM+Plex+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: a sky-blue "diorama" band for the hero (the sample game's own sky),
+   then calm paper sections; code always sits on the editor's dark panel. */
+:root {
+  --paper: #f3f6fa;
+  --surface: #ffffff;
+  --ink: #142033;
+  --muted: #56647a;
+  --line: #d8e0eb;
+  --sky: #6d9edc;
+  --sky-soft: #e2edfa;
+  --sky-deep: #2d5f9e;
+  --grass: #2f7d3a;
+  --orb: #f5c12a;
+  --orb-ink: #4d3800;
+  --code-bg: #17191d;
+  --code-fg: #e4e7ec;
+  --code-dim: #808894;
+  --shadow: 0 18px 50px -24px rgba(20, 45, 80, 0.45);
+  --font-display: "Bricolage Grotesque", "Avenir Next", "Segoe UI", sans-serif;
+  --font-body: "IBM Plex Sans", "Helvetica Neue", Arial, sans-serif;
+  --font-mono: "JetBrains Mono", "DejaVu Sans Mono", Menlo, monospace;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #0e131a; --surface: #151c26; --ink: #e4ebf4; --muted: #9babbf; --line: #243142;
+    --sky: #8ab5ec; --sky-soft: #142235; --sky-deep: #a9c9f2; --grass: #6cc178; --orb: #ffd54a; --orb-ink: #2a1f00;
+    --code-bg: #0a0c0f; --code-fg: #e4e7ec; --code-dim: #7c8592; --shadow: 0 18px 50px -24px rgba(0, 0, 0, 0.8);
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #0e131a; --surface: #151c26; --ink: #e4ebf4; --muted: #9babbf; --line: #243142;
+  --sky: #8ab5ec; --sky-soft: #142235; --sky-deep: #a9c9f2; --grass: #6cc178; --orb: #ffd54a; --orb-ink: #2a1f00;
+  --code-bg: #0a0c0f; --code-fg: #e4e7ec; --code-dim: #7c8592; --shadow: 0 18px 50px -24px rgba(0, 0, 0, 0.8);
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } * { animation: none !important; transition: none !important; } }
+body { margin: 0; background: var(--paper); color: var(--ink); font: 400 17px/1.6 var(--font-body); -webkit-font-smoothing: antialiased; }
+a { color: var(--sky-deep); text-underline-offset: 3px; }
+a:focus-visible, button:focus-visible { outline: 3px solid var(--orb); outline-offset: 3px; border-radius: 4px; }
+.wrap { max-width: 1160px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+h1, h2, h3 { font-family: var(--font-display); line-height: 1.08; margin: 0; text-wrap: balance; letter-spacing: -0.01em; }
+h2 { font-size: clamp(30px, 4vw, 44px); font-weight: 800; }
+h3 { font-size: 21px; font-weight: 700; }
+p { margin: 0; }
+code, kbd, pre { font-family: var(--font-mono); }
+.eyebrow { font: 600 13px/1 var(--font-body); letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); }
+
+/* nav */
+.nav { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding-block: 18px; }
+.brand { display: flex; align-items: center; gap: 10px; text-decoration: none; color: var(--ink); font: 800 22px/1 var(--font-display); }
+.logo { width: 30px; height: 30px; flex: none; }
+.nav ul { display: flex; gap: 22px; list-style: none; margin: 0; padding: 0; flex-wrap: wrap; }
+.nav ul a { color: var(--ink); text-decoration: none; font-weight: 500; font-size: 15px; }
+.nav ul a:hover { color: var(--sky-deep); text-decoration: underline; }
+
+/* hero */
+.hero { background: linear-gradient(180deg, var(--sky-soft) 0%, var(--paper) 100%); border-bottom: 1px solid var(--line); }
+.hero-grid { display: grid; grid-template-columns: minmax(0, 0.92fr) minmax(0, 1.08fr); gap: 48px; align-items: center; padding-block: 36px 64px; }
+.hero h1 { font-size: clamp(40px, 5.6vw, 70px); font-weight: 800; }
+.hero h1 .day { background: linear-gradient(transparent 62%, var(--orb) 62%, var(--orb) 92%, transparent 92%); padding: 0 2px; }
+.lede { font-size: 19px; color: var(--muted); max-width: 34em; margin-top: 20px; }
+.lede strong { color: var(--ink); font-weight: 600; }
+.cta { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 28px; }
+.btn { display: inline-flex; align-items: center; gap: 8px; padding: 12px 20px; border-radius: 10px; font: 600 16px/1 var(--font-body); text-decoration: none; border: 2px solid transparent; }
+.btn-orb { background: var(--orb); color: var(--orb-ink); }
+.btn-orb:hover { filter: brightness(1.05); }
+.btn-line { border-color: var(--ink); color: var(--ink); }
+.btn-line:hover { background: var(--ink); color: var(--paper); }
+.install { margin-top: 28px; background: var(--code-bg); color: var(--code-fg); border-radius: 12px; padding: 16px 18px; font-size: 14px; line-height: 1.75; overflow-x: auto; }
+.install .p { color: var(--orb); user-select: none; }
+.install .c { color: var(--code-dim); }
+.shot { margin: 0; border-radius: 12px; overflow: hidden; box-shadow: var(--shadow); border: 1px solid var(--line); background: var(--code-bg); }
+.shot img { display: block; width: 100%; height: auto; }
+.shot figcaption { font-size: 13px; color: var(--code-dim); padding: 9px 14px; font-family: var(--font-mono); }
+
+section { padding-block: 84px; }
+.section-head { display: grid; gap: 14px; max-width: 46em; margin-bottom: 40px; }
+.section-head p { color: var(--muted); font-size: 18px; }
+
+/* language card */
+.lang { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.85fr); gap: 40px; align-items: start; }
+.code { background: var(--code-bg); color: var(--code-fg); border-radius: 14px; padding: 22px 22px 22px 0; font-size: 14.5px; line-height: 1.7; overflow-x: auto; box-shadow: var(--shadow); margin: 0; }
+.code .ln { display: inline-block; width: 3.2em; padding-right: 1.2em; text-align: right; color: #4b525c; user-select: none; }
+.tok-kw { color: #f2a97c; } .tok-str { color: #a8d99a; } .tok-com { color: #7d8693; font-style: italic; }
+.tok-num { color: #f3d675; } .tok-ivar { color: #86d4ca; } .tok-sym { color: #c7a2f2; } .tok-const { color: #8db1f2; }
+.notes { list-style: none; margin: 0; padding: 0; display: grid; gap: 22px; }
+.notes li { display: grid; grid-template-columns: 34px minmax(0, 1fr); gap: 14px; }
+.notes .mark { width: 34px; height: 34px; border-radius: 50%; background: var(--orb); color: var(--orb-ink); display: grid; place-items: center; font: 700 15px/1 var(--font-mono); }
+.notes h3 { font-size: 18px; margin-bottom: 4px; }
+.notes p { color: var(--muted); font-size: 16px; }
+.keywords { margin-top: 36px; display: grid; gap: 14px; }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.chips code { background: var(--surface); border: 1px solid var(--line); border-radius: 7px; padding: 4px 9px; font-size: 14px; color: var(--ink); }
+
+/* schedule */
+.day-plan { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0; border: 1px solid var(--line); border-radius: 14px; overflow: hidden; background: var(--surface); }
+.hour { padding: 22px 20px 24px; border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); display: grid; gap: 8px; align-content: start; text-decoration: none; color: inherit; }
+.hour:nth-child(4n) { border-right: 0; }
+.hour:nth-last-child(-n+4) { border-bottom: 0; }
+.hour:hover { background: var(--sky-soft); }
+.hour .time { font: 600 13px/1 var(--font-mono); color: var(--sky-deep); }
+.hour h3 { font-size: 19px; }
+.hour p { color: var(--muted); font-size: 15px; }
+.hour.lunch { background: repeating-linear-gradient(135deg, transparent 0 10px, var(--sky-soft) 10px 20px); }
+
+/* features */
+.features { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 40px 48px; }
+.feature { display: grid; gap: 8px; align-content: start; }
+.feature .glyph { width: 40px; height: 40px; }
+.feature p { color: var(--muted); font-size: 16px; }
+.split { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 40px; align-items: center; }
+
+/* terminal */
+.term { background: var(--code-bg); color: var(--code-fg); border-radius: 14px; padding: 20px 22px; font-size: 14px; line-height: 1.75; overflow-x: auto; margin: 0; box-shadow: var(--shadow); }
+.term .p { color: var(--orb); user-select: none; }
+.term .o { color: var(--code-dim); }
+
+/* layers */
+.layers { display: grid; gap: 10px; }
+.layer { display: grid; grid-template-columns: 170px minmax(0, 1fr); gap: 16px; align-items: center; padding: 14px 18px; border-radius: 10px; background: var(--surface); border: 1px solid var(--line); }
+.layer b { font-family: var(--font-mono); font-size: 14px; color: var(--sky-deep); }
+.layer span { color: var(--muted); font-size: 15px; }
+.layer.os { background: transparent; border-style: dashed; }
+
+footer { border-top: 1px solid var(--line); padding-block: 36px 48px; color: var(--muted); font-size: 14px; }
+footer .wrap { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 16px; }
+
+@media (max-width: 960px) {
+  .hero-grid, .lang, .split { grid-template-columns: minmax(0, 1fr); }
+  .features { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .day-plan { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .hour:nth-child(4n) { border-right: 1px solid var(--line); }
+  .hour:nth-child(2n) { border-right: 0; }
+  .hour:nth-last-child(-n+4) { border-bottom: 1px solid var(--line); }
+  .hour:nth-last-child(-n+2) { border-bottom: 0; }
+}
+@media (max-width: 600px) {
+  body { font-size: 16px; }
+  section { padding-block: 60px; }
+  .features, .day-plan { grid-template-columns: minmax(0, 1fr); }
+  .hour { border-right: 0 !important; border-bottom: 1px solid var(--line) !important; }
+  .hour:last-child { border-bottom: 0 !important; }
+  .layer { grid-template-columns: minmax(0, 1fr); gap: 4px; }
+  .nav ul { gap: 14px; }
+}
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <div class="wrap">
+    <nav class="nav" aria-label="Main">
+      <a class="brand" href="index.html">
+        <svg class="logo" viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="16" r="15" fill="var(--sky-deep)"/><circle cx="16" cy="16" r="7" fill="var(--paper)"/><rect x="16" y="13.5" width="16" height="5" fill="var(--paper)"/><circle cx="16" cy="16" r="3" fill="var(--orb)"/></svg>
+        Grodot
+      </a>
+      <ul>
+        <li><a href="docs.html">Docs</a></li>
+        <li><a href="docs.html#learn">Learn Groscript</a></li>
+        <li><a href="docs.html#api">Engine API</a></li>
+        <li><a href="https://github.com/evanxdsouza/grodot">GitHub</a></li>
+      </ul>
+    </nav>
+
+    <div class="hero-grid">
+      <div>
+        <p class="eyebrow">Linux-first 3D game engine &middot; v0.1</p>
+        <h1 style="margin-top:14px">Make a 3D game. Learn its language in <span class="day">a day</span>.</h1>
+        <p class="lede">Grodot is a small engine with a visual editor and <strong>Groscript</strong>, a friendly Ruby-style language with 24 keywords. Build a scene, attach a script, press Play. It runs on any Linux desktop and needs nothing but <code>cargo</code> to build.</p>
+        <div class="cta">
+          <a class="btn btn-orb" href="docs.html#learn">Start the one-day course</a>
+          <a class="btn btn-line" href="docs.html">Read the docs</a>
+        </div>
+        <pre class="install" aria-label="Install commands"><span class="c"># build from source (Rust stable, no other packages)</span>
+<span class="p">$ </span>git clone https://github.com/evanxdsouza/grodot && cd grodot
+<span class="p">$ </span>cargo build --release
+<span class="p">$ </span>./target/release/grodot new my-game
+<span class="p">$ </span>./target/release/grodot open my-game</pre>
+      </div>
+      <figure class="shot">
+        <img src="img/editor.jpg" width="1440" height="900" alt="The Grodot editor: a hierarchy of entities on the left, a 3D garden scene with platforms, trees and golden orbs in the middle, and the inspector showing the Player's Transform, MeshRenderer, Collider and RigidBody on the right.">
+        <figcaption>The editor with the Orb Garden sample game</figcaption>
+      </figure>
+    </div>
+  </div>
+</header>
+
+<main>
+  <section id="language">
+    <div class="wrap">
+      <div class="section-head">
+        <p class="eyebrow">Groscript</p>
+        <h2>The whole language fits on one screen</h2>
+        <p>Blocks end with <code>end</code>. Calls always use parentheses. Fields start with <code>@</code>. Errors point at the line and column. If you have written a little Ruby, Python or Lua, you can read this already.</p>
+      </div>
+      <div class="lang">
+        <pre class="code" data-gro><code># scripts/orb.gro
+class Orb &lt; Entity
+  SPIN = 90
+
+  function ready()
+    @base_y = self.position.y
+    @phase = Math.random() * 6.28
+  end
+
+  function update(delta)
+    @phase += delta * 2
+    self.position = self.position.with_y(@base_y + Math.sin(@phase) * 0.15)
+    self.rotate(Vector3.new(0, SPIN * delta, 0))
+  end
+
+  function on_collision(other)
+    if other.tag == "player"
+      Audio.play("assets/audio/pickup.wav")
+      Scene.find("GameManager").collect_orb()
+      destroy()
+    end
+  end
+end</code></pre>
+        <div>
+          <ol class="notes">
+            <li><span class="mark">1</span><div><h3>Scripts are classes</h3><p><code>class Orb &lt; Entity</code> attaches to an object in your scene. The engine calls <code>ready</code>, <code>update</code> and <code>on_collision</code> when they matter.</p></div></li>
+            <li><span class="mark">2</span><div><h3><code>@fields</code> remember things</h3><p>Instance variables live on the object. Other scripts can read them too: <code>orb.phase</code>.</p></div></li>
+            <li><span class="mark">3</span><div><h3>Parentheses mean "do something"</h3><p><code>self.position</code> is data; <code>destroy()</code> is an action. One rule, no guessing.</p></div></li>
+            <li><span class="mark">4</span><div><h3>Errors you can act on</h3><p>Every error names the file, line and column, draws a caret under the mistake and shows the call stack. A broken script is disabled; the editor keeps running.</p></div></li>
+          </ol>
+        </div>
+      </div>
+      <div class="keywords">
+        <p class="eyebrow">All 24 keywords</p>
+        <div class="chips">
+          <code>function</code><code>class</code><code>module</code><code>import</code><code>if</code><code>elsif</code><code>else</code><code>while</code><code>for</code><code>in</code><code>repeat</code><code>times</code><code>return</code><code>break</code><code>next</code><code>end</code><code>true</code><code>false</code><code>nil</code><code>self</code><code>super</code><code>and</code><code>or</code><code>not</code>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="day" style="background: var(--surface); border-block: 1px solid var(--line);">
+    <div class="wrap">
+      <div class="section-head">
+        <p class="eyebrow">The one-day course</p>
+        <h2>From <code>print</code> to a playable game, 9 to 5</h2>
+        <p>Eight short lessons. Every example on the docs site is a real file that our test suite runs, so the output you see is the output you get.</p>
+      </div>
+      <div class="day-plan">
+        <a class="hour" href="docs.html#learn-1"><span class="time">09:00</span><h3>Values and variables</h3><p>Numbers, strings, nil, interpolation, and why only <code>false</code> and <code>nil</code> are falsey.</p></a>
+        <a class="hour" href="docs.html#learn-2"><span class="time">10:00</span><h3>Decisions and loops</h3><p><code>if</code>/<code>elsif</code>, <code>while</code>, <code>for</code>, and the friendly <code>repeat 3 times</code>.</p></a>
+        <a class="hour" href="docs.html#learn-3"><span class="time">11:00</span><h3>Functions</h3><p>Parameters, defaults, <code>return</code>, predicate names like <code>alive?</code>.</p></a>
+        <a class="hour lunch" href="docs.html#learn-4"><span class="time">13:00</span><h3>Arrays and hashes</h3><p>Inventories, lookup tables and symbols like <code>:idle</code>.</p></a>
+        <a class="hour" href="docs.html#learn-5"><span class="time">14:00</span><h3>Classes</h3><p><code>initialize</code>, <code>@fields</code>, inheritance and <code>super</code>.</p></a>
+        <a class="hour" href="docs.html#learn-6"><span class="time">15:00</span><h3>Modules and errors</h3><p>Split code across files with <code>import</code>; read an error report.</p></a>
+        <a class="hour" href="docs.html#learn-7"><span class="time">16:00</span><h3>Your first game script</h3><p>Lifecycle callbacks, <code>Input</code>, <code>Time</code> and moving an entity.</p></a>
+        <a class="hour" href="docs.html#learn-8"><span class="time">17:00</span><h3>Make the game</h3><p>Collisions, pickups, a score, a win screen and a packaged build.</p></a>
+      </div>
+    </div>
+  </section>
+
+  <section id="engine">
+    <div class="wrap">
+      <div class="section-head">
+        <p class="eyebrow">The engine</p>
+        <h2>Everything a jam game needs, nothing it doesn't</h2>
+        <p>Grodot is built for one person making a small 3D game. Each piece is simple enough to read in an afternoon.</p>
+      </div>
+      <div class="features">
+        <div class="feature">
+          <svg class="glyph" viewBox="0 0 40 40" aria-hidden="true"><rect x="3" y="7" width="34" height="26" rx="4" fill="none" stroke="var(--sky-deep)" stroke-width="2.5"/><rect x="3" y="7" width="10" height="26" rx="2" fill="var(--sky-soft)" stroke="var(--sky-deep)" stroke-width="2.5"/><circle cx="25" cy="20" r="5" fill="var(--orb)"/></svg>
+          <h3>A real editor</h3>
+          <p>Viewport with orbit camera and move gizmo, hierarchy with drag-to-parent, inspector for every component, asset browser, console, undo and redo.</p>
+        </div>
+        <div class="feature">
+          <svg class="glyph" viewBox="0 0 40 40" aria-hidden="true"><path d="M8 8 L32 20 L8 32 Z" fill="var(--grass)"/></svg>
+          <h3>Play without fear</h3>
+          <p>Play runs a copy of your scene. Stop throws the copy away, so testing never changes what you built.</p>
+        </div>
+        <div class="feature">
+          <svg class="glyph" viewBox="0 0 40 40" aria-hidden="true"><path d="M6 30 L20 8 L34 30 Z" fill="none" stroke="var(--sky-deep)" stroke-width="2.5" stroke-linejoin="round"/><path d="M6 30 L20 20 L34 30" fill="none" stroke="var(--sky-deep)" stroke-width="2.5"/><circle cx="20" cy="20" r="3" fill="var(--orb)"/></svg>
+          <h3>Software renderer</h3>
+          <p>A multithreaded rasterizer with depth, lighting, fog and soft shadows. No GPU drivers to fight, and it renders in CI.</p>
+        </div>
+        <div class="feature">
+          <svg class="glyph" viewBox="0 0 40 40" aria-hidden="true"><rect x="5" y="26" width="30" height="7" rx="2" fill="var(--sky-soft)" stroke="var(--sky-deep)" stroke-width="2.5"/><rect x="14" y="10" width="12" height="12" rx="2" fill="var(--orb)"/><path d="M20 4 v4" stroke="var(--sky-deep)" stroke-width="2.5"/></svg>
+          <h3>Physics that behaves</h3>
+          <p>Boxes and spheres, dynamic and kinematic bodies, sensors, raycasts and <code>on_floor?()</code>. Collisions arrive as <code>on_collision(other)</code>.</p>
+        </div>
+        <div class="feature">
+          <svg class="glyph" viewBox="0 0 40 40" aria-hidden="true"><path d="M6 16 h7 l9 -8 v24 l-9 -8 h-7 z" fill="var(--sky-deep)"/><path d="M27 13 q5 7 0 14" fill="none" stroke="var(--orb)" stroke-width="3" stroke-linecap="round"/></svg>
+          <h3>Sound and HUD</h3>
+          <p><code>Audio.play</code> for effects and music over ALSA, PipeWire or PulseAudio. <code>UI.text</code> and <code>UI.message</code> for scores and win screens.</p>
+        </div>
+        <div class="feature">
+          <svg class="glyph" viewBox="0 0 40 40" aria-hidden="true"><rect x="6" y="10" width="28" height="22" rx="3" fill="none" stroke="var(--sky-deep)" stroke-width="2.5"/><path d="M6 16 h28" stroke="var(--sky-deep)" stroke-width="2.5"/><path d="M15 6 h10" stroke="var(--orb)" stroke-width="3" stroke-linecap="round"/></svg>
+          <h3>Ship a .tar.gz</h3>
+          <p><code>grodot package</code> bundles the runtime and your game into one archive with a <code>run.sh</code>. Players unpack and run.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="workflow" style="padding-top: 0;">
+    <div class="wrap split">
+      <div class="section-head" style="margin:0">
+        <p class="eyebrow">The workflow</p>
+        <h2>From an empty folder to a packaged game</h2>
+        <p>The editor is where you build. The <code>grodot</code> command creates projects, checks them for mistakes, runs them without the editor and packages them for players.</p>
+        <p><a href="docs.html#cli">See every command</a></p>
+      </div>
+      <pre class="term"><span class="p">$ </span>grodot new orb-garden
+<span class="o">Created project 'orb garden' in orb-garden</span>
+<span class="p">$ </span>grodot open orb-garden      <span class="o"># build, press F5 to play</span>
+<span class="p">$ </span>grodot check orb-garden
+<span class="o">Checking 'Orb Garden'
+  scenes/main.gscene: 29 entities
+  6 script(s), 2 scene/prefab file(s)
+OK: no problems found.</span>
+<span class="p">$ </span>grodot run orb-garden --headless --frames 600
+<span class="o">Ran 600 frames headless without errors.</span>
+<span class="p">$ </span>grodot package orb-garden
+<span class="o">Packaged builds/orb-garden-0.1.0-linux-x86_64.tar.gz</span></pre>
+    </div>
+  </section>
+
+  <section id="inside" style="background: var(--surface); border-block: 1px solid var(--line);">
+    <div class="wrap split">
+      <div class="section-head" style="margin:0">
+        <p class="eyebrow">Under the hood</p>
+        <h2>Pure Rust, zero dependencies</h2>
+        <p>Grodot uses only the Rust standard library. X11 and ALSA are loaded when the program starts, so <code>cargo build</code> needs no system packages and the same binary runs headless on a server.</p>
+        <p>Groscript never sees renderer or physics types. Scripts talk to the engine through a small set of documented bindings.</p>
+      </div>
+      <div class="layers" aria-label="Architecture layers, top to bottom">
+        <div class="layer"><b>grodot-editor</b><span>Viewport, hierarchy, inspector, assets, console, Play mode</span></div>
+        <div class="layer"><b>grodot-runtime</b><span>Game loop, lifecycle, physics, script bindings</span></div>
+        <div class="layer"><b>groscript</b><span>Lexer, parser, tree-walking interpreter</span></div>
+        <div class="layer"><b>grodot-render</b><span>Software rasterizer, fonts, picking</span></div>
+        <div class="layer"><b>grodot-core</b><span>Math, JSON, scenes, components, meshes</span></div>
+        <div class="layer os"><b>Linux</b><span>libX11 and libasound, loaded with dlopen</span></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="play">
+    <div class="wrap split">
+      <figure class="shot">
+        <img src="img/game.jpg" width="1280" height="720" alt="Orb Garden running in its own window: a blue capsule player on a green field with sandy platforms, golden orbs and red sliding hazards; the HUD reads Orbs 0/5, Lives, Time 1:28." loading="lazy">
+        <figcaption>Orb Garden, the sample game (about 200 lines of Groscript)</figcaption>
+      </figure>
+      <div class="section-head" style="margin:0">
+        <p class="eyebrow">Sample game</p>
+        <h2>Orb Garden</h2>
+        <p>Collect five orbs before the clock runs out. Jump between platforms, dodge sliding hazards and press R to try again. It uses every part of the engine and ships in <code>examples/orb-garden</code>.</p>
+        <p><code>grodot run examples/orb-garden</code></p>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <span>Grodot 0.1 &middot; MIT licensed &middot; Linux x86_64</span>
+    <span>Grodot is an independent project and is not affiliated with or endorsed by the Godot Foundation.</span>
+  </div>
+</footer>
+
+<script>
+// Minimal Groscript highlighter for code blocks marked data-gro.
+(function () {
+  var KW = /^(function|class|module|import|if|elsif|else|while|for|in|repeat|times|return|break|next|end|true|false|nil|self|super|and|or|not)$/;
+  function esc(s) { return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
+  function span(cls, s) { return '<span class="tok-' + cls + '">' + esc(s) + "</span>"; }
+  function highlightLine(line) {
+    var out = "", i = 0;
+    while (i < line.length) {
+      var c = line[i], rest = line.slice(i), m;
+      if (c === "#") { out += span("com", rest); break; }
+      if (c === '"') {
+        var j = i + 1;
+        while (j < line.length && line[j] !== '"') { if (line[j] === "\\") j++; j++; }
+        out += span("str", line.slice(i, j + 1)); i = j + 1; continue;
+      }
+      if ((m = rest.match(/^@[A-Za-z_]\w*/))) { out += span("ivar", m[0]); i += m[0].length; continue; }
+      if ((m = rest.match(/^\$[A-Za-z_]\w*/))) { out += span("ivar", m[0]); i += m[0].length; continue; }
+      if ((m = rest.match(/^:[A-Za-z_]\w*\??/)) && (i === 0 || !/[\w"\)\]]/.test(line[i - 1]))) { out += span("sym", m[0]); i += m[0].length; continue; }
+      if ((m = rest.match(/^\d[\d_]*(\.\d+)?/)) && (i === 0 || !/\w/.test(line[i - 1]))) { out += span("num", m[0]); i += m[0].length; continue; }
+      if ((m = rest.match(/^[A-Za-z_]\w*\??/))) {
+        var w = m[0];
+        out += KW.test(w) ? span("kw", w) : /^[A-Z]/.test(w) ? span("const", w) : esc(w);
+        i += w.length; continue;
+      }
+      out += esc(c); i++;
+    }
+    return out;
+  }
+  document.querySelectorAll("pre[data-gro] code").forEach(function (el) {
+    var lines = el.textContent.replace(/\n$/, "").split("\n");
+    el.innerHTML = lines.map(function (l, n) { return '<span class="ln">' + (n + 1) + "</span>" + highlightLine(l); }).join("\n");
+  });
+})();
+</script>
+</body>
+</html>

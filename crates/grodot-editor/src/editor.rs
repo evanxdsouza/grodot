@@ -135,7 +135,7 @@ impl Editor {
             }
         };
         let mut log = Log::default();
-        log.info(format!("Opened project '{}' ({})", project.config.name, project.root.display()));
+        log.info(format!("Opened project '{}'", project.config.name));
         let mut ed = Editor {
             renderer: SceneRenderer::new(Some(project.root.clone())),
             last_stable: scene.clone(),
