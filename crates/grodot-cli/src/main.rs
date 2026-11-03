@@ -280,7 +280,9 @@ fn check_project(dir: &Path) -> Result<usize, String> {
         };
         let mut cameras = 0;
         for e in &scene.entities {
-            if e.camera().map(|c| c.active).unwrap_or(false) {
+            if e.camera().map(|c| c.active).unwrap_or(false)
+                || matches!(e.get("Camera2D"), Some(grodot_core::Component::Camera2D(c)) if c.active)
+            {
                 cameras += 1;
             }
             let need = |what: &str, path: &str| {
@@ -302,7 +304,7 @@ fn check_project(dir: &Path) -> Result<usize, String> {
             }
         }
         if sp.extension().map(|e| e == "gscene").unwrap_or(false) && cameras == 0 {
-            report(format!("{}: no active Camera (the game would show nothing)", rel));
+            report(format!("{}: no active Camera or Camera2D (the game would show nothing)", rel));
         }
         println!("  {}: {} entities", rel, scene.entities.len());
     }

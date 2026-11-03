@@ -196,6 +196,39 @@ impl Canvas {
         }
     }
 
+    /// Fill a convex polygon using scanline spans. Coordinates are clipped to
+    /// the current canvas clip rectangle before pixels are touched.
+    pub fn fill_polygon(&mut self, points: &[(f32, f32)], c: Rgb, alpha: u32) {
+        if points.len() < 3 || points.iter().any(|(x, y)| !x.is_finite() || !y.is_finite()) {
+            return;
+        }
+        let min_y = points.iter().map(|p| p.1).fold(f32::INFINITY, f32::min).floor() as i32;
+        let max_y = points.iter().map(|p| p.1).fold(f32::NEG_INFINITY, f32::max).ceil() as i32;
+        let y0 = min_y.max(self.clip.y);
+        let y1 = max_y.min(self.clip.bottom());
+        let mut intersections = Vec::with_capacity(points.len());
+        for y in y0..y1 {
+            intersections.clear();
+            let scan_y = y as f32 + 0.5;
+            for i in 0..points.len() {
+                let (x0, py0) = points[i];
+                let (x1, py1) = points[(i + 1) % points.len()];
+                if (py0 <= scan_y && py1 > scan_y) || (py1 <= scan_y && py0 > scan_y) {
+                    intersections.push(x0 + (scan_y - py0) * (x1 - x0) / (py1 - py0));
+                }
+            }
+            intersections.sort_by(f32::total_cmp);
+            for pair in intersections.chunks(2) {
+                let [left_x, right_x] = pair else { continue };
+                let left = (left_x.ceil() as i32).max(self.clip.x);
+                let right = (right_x.ceil() as i32).min(self.clip.right());
+                for x in left..right {
+                    self.put(x, y, c, alpha);
+                }
+            }
+        }
+    }
+
     pub fn font(&self, id: FontId) -> &'static Font {
         &FONTS[id as usize]
     }

@@ -1,0 +1,13 @@
+[project]
+name = "2D Starter"
+version = "0.1.0"
+engine = "grodot"
+config_version = 1
+
+[game]
+main_scene = "scenes/main.gscene"
+
+[window]
+width = 960
+height = 540
+title = "Grodot 2D Starter"

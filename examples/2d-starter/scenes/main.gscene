@@ -1,0 +1,120 @@
+{
+  "scene_version": 1,
+  "name": "2D Starter",
+  "environment": {
+    "background": "#18243a",
+    "ambient": 0.45
+  },
+  "entities": [
+    {
+      "id": 1,
+      "name": "Camera2D",
+      "parent": null,
+      "active": true,
+      "tag": "",
+      "components": [
+        {
+          "type": "Transform",
+          "position": [0, 0, 0],
+          "rotation": [0, 0, 0, 1],
+          "scale": [1, 1, 1]
+        },
+        {
+          "type": "Camera2D",
+          "active": true,
+          "zoom": 1,
+          "pixels_per_unit": 64
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "name": "Backdrop",
+      "parent": null,
+      "active": true,
+      "tag": "",
+      "components": [
+        {
+          "type": "Transform",
+          "position": [0, 0, 0],
+          "rotation": [0, 0, 0, 1],
+          "scale": [1, 1, 1]
+        },
+        {
+          "type": "Sprite2D",
+          "color": "#283b5b",
+          "size": [12, 7, 1],
+          "visible": true,
+          "z_index": -2
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "name": "Platform",
+      "parent": null,
+      "active": true,
+      "tag": "",
+      "components": [
+        {
+          "type": "Transform",
+          "position": [0, -2, 0],
+          "rotation": [0, 0, 0, 1],
+          "scale": [1, 1, 1]
+        },
+        {
+          "type": "Sprite2D",
+          "color": "#63c8a8",
+          "size": [8, 0.6, 1],
+          "visible": true,
+          "z_index": 0
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "name": "Player",
+      "parent": null,
+      "active": true,
+      "tag": "player",
+      "groups": ["actors"],
+      "components": [
+        {
+          "type": "Transform",
+          "position": [-1, -1, 0],
+          "rotation": [0, 0, 0, 1],
+          "scale": [1, 1, 1]
+        },
+        {
+          "type": "Sprite2D",
+          "color": "#ffd166",
+          "size": [0.8, 1, 1],
+          "visible": true,
+          "z_index": 2
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "name": "Accent",
+      "parent": null,
+      "active": true,
+      "tag": "",
+      "components": [
+        {
+          "type": "Transform",
+          "position": [2.2, 0.7, 0],
+          "rotation": [0, 0, 0.258819, 0.965926],
+          "scale": [1, 1, 1]
+        },
+        {
+          "type": "Sprite2D",
+          "color": "#ef6f6c",
+          "size": [1.5, 1.5, 1],
+          "visible": true,
+          "z_index": 1
+        }
+      ]
+    }
+  ]
+}

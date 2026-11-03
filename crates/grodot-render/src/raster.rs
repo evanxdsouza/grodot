@@ -163,11 +163,11 @@ pub fn draw_meshes(canvas: &mut Canvas, viewport: Rect, view: &View, light: &Lig
             let c = mvp.transform4(*p);
             cverts.push(CV { x: c.x, y: c.y, z: c.z, w: c.w, r, g, b });
         }
-        let (triangles, _) = item.mesh.indices.as_chunks::<3>();
-        for tri in triangles {
-            let a = cverts[tri[0] as usize];
-            let b = cverts[tri[1] as usize];
-            let c = cverts[tri[2] as usize];
+        for tri in item.mesh.indices.chunks(3) {
+            let [i0, i1, i2] = tri else { continue };
+            let a = cverts[*i0 as usize];
+            let b = cverts[*i1 as usize];
+            let c = cverts[*i2 as usize];
             // Trivial reject: all outside the same frustum plane.
             let out = |f: &dyn Fn(&CV) -> bool| f(&a) && f(&b) && f(&c);
             if out(&|v| v.x > v.w)

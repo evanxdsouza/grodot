@@ -1,6 +1,6 @@
 # Grodot
 
-**A Linux-first 3D game engine with a scripting language you can learn in a day.**
+**A Linux-first 2D and 3D game engine with a scripting language you can learn in a day.**
 
 Grodot is a small, coherent engine for game-jam sized 3D games: a graphical
 editor, a runtime, simple physics, audio, and **Groscript**, a friendly
@@ -56,8 +56,9 @@ grodot run examples/orb-garden   # play the sample game
 | --- | --- |
 | **Editor** | Viewport with orbit camera and move gizmo, hierarchy with drag-to-parent, inspector for every component, asset browser, console, undo/redo, Play/Stop on an isolated copy of the scene. |
 | **Groscript** | Dynamically typed, `end`-terminated blocks, classes with single inheritance, modules and imports, arrays, hashes, symbols, string interpolation, vectors and colours. Errors show the file, line, a caret and the call stack. |
-| **Runtime** | Entity/component scenes, lifecycle callbacks (`ready`, `update`, `fixed_update`, `on_collision`, ...), timers, prefabs, scene loading, HUD text. Script errors disable one script, never the editor. |
+| **Runtime** | Entity/component scenes, lifecycle callbacks (`ready`, `update`, `fixed_update`, `on_collision`, ...), timers, prefabs, scene loading, node paths, named groups, `queue_free()`, HUD text. Script errors disable one script, never the editor. |
 | **Rendering** | Multithreaded software rasterizer: depth buffer, Gouraud lighting, fog, blob shadows, primitives and `.obj` meshes. Runs anywhere, including headless CI. |
+| **2D** | `Camera2D` with zoom and world scale, colored/alpha-blended `Sprite2D` rectangles, transform hierarchy, rotation, and z ordering. See `examples/2d-starter`. |
 | **Physics** | Fixed-step boxes and spheres: dynamic, kinematic and static bodies, sensors, collision enter/exit events, raycasts, `on_floor?()`. |
 | **Audio** | WAV playback with a software mixer over ALSA (works on PipeWire and PulseAudio). Missing audio is a warning, not a crash. |
 | **CLI** | `new`, `open`, `run`, `check`, `test`, `script`, `repl`, `package` (builds a `.tar.gz` you can hand to players). |
@@ -72,6 +73,10 @@ grodot run examples/orb-garden   # play the sample game
   [roadmap](ROADMAP.md), [contributing](CONTRIBUTING.md).
 
 Open `website/index.html` in a browser for the landing page.
+
+For a small editable 2D scene, run `grodot run examples/2d-starter` or open it
+with `grodot open examples/2d-starter`. Texture-backed sprites and 2D physics
+are planned separately.
 
 ## Repository layout
 

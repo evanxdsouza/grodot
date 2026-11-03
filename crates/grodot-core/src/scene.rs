@@ -38,6 +38,25 @@ pub struct Camera {
     pub active: bool,
 }
 
+/// Orthographic camera for 2D scenes. One world unit is `pixels_per_unit`
+/// pixels at zoom 1; larger zoom values bring objects closer.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Camera2D {
+    pub active: bool,
+    pub zoom: f32,
+    pub pixels_per_unit: f32,
+}
+
+/// A solid-colour 2D rectangle. Texture-backed sprites can use the same
+/// transform and camera path once image assets are supported.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Sprite2D {
+    pub color: Color,
+    pub size: crate::math::Vec3,
+    pub visible: bool,
+    pub z_index: i32,
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct MeshRenderer {
     /// A primitive (`cube`, `sphere`, `plane`, `cylinder`, `capsule`) or a
@@ -125,6 +144,8 @@ pub struct Light {
 pub enum Component {
     Transform(Transform),
     Camera(Camera),
+    Camera2D(Camera2D),
+    Sprite2D(Sprite2D),
     MeshRenderer(MeshRenderer),
     RigidBody(RigidBody),
     Collider(Collider),
@@ -134,8 +155,18 @@ pub enum Component {
 }
 
 /// Every component type, in inspector order.
-pub const COMPONENT_TYPES: [&str; 8] =
-    ["Transform", "Camera", "MeshRenderer", "RigidBody", "Collider", "AudioSource", "Script", "Light"];
+pub const COMPONENT_TYPES: [&str; 10] = [
+    "Transform",
+    "Camera",
+    "Camera2D",
+    "Sprite2D",
+    "MeshRenderer",
+    "RigidBody",
+    "Collider",
+    "AudioSource",
+    "Script",
+    "Light",
+];
 
 pub const PRIMITIVE_MESHES: [&str; 5] = ["cube", "sphere", "plane", "cylinder", "capsule"];
 
@@ -155,6 +186,8 @@ impl Component {
         match self {
             Component::Transform(_) => "Transform",
             Component::Camera(_) => "Camera",
+            Component::Camera2D(_) => "Camera2D",
+            Component::Sprite2D(_) => "Sprite2D",
             Component::MeshRenderer(_) => "MeshRenderer",
             Component::RigidBody(_) => "RigidBody",
             Component::Collider(_) => "Collider",
@@ -169,6 +202,13 @@ impl Component {
         Some(match type_name {
             "Transform" => Component::Transform(Transform::default()),
             "Camera" => Component::Camera(Camera { fov: 70.0, near: 0.1, far: 500.0, active: true }),
+            "Camera2D" => Component::Camera2D(Camera2D { active: true, zoom: 1.0, pixels_per_unit: 64.0 }),
+            "Sprite2D" => Component::Sprite2D(Sprite2D {
+                color: Color::WHITE,
+                size: Vec3 { x: 1.0, y: 1.0, z: 1.0 },
+                visible: true,
+                z_index: 0,
+            }),
             "MeshRenderer" => Component::MeshRenderer(MeshRenderer {
                 mesh: "cube".into(),
                 color: Color::rgb(0.8, 0.8, 0.8),
@@ -216,6 +256,17 @@ impl Component {
                 ("near_clip", F::Float(c.near)),
                 ("far_clip", F::Float(c.far)),
                 ("active", F::Bool(c.active)),
+            ],
+            Component::Camera2D(c) => vec![
+                ("active", F::Bool(c.active)),
+                ("zoom", F::Float(c.zoom)),
+                ("pixels_per_unit", F::Float(c.pixels_per_unit)),
+            ],
+            Component::Sprite2D(s) => vec![
+                ("color", F::Color(s.color)),
+                ("size", F::Vec3(s.size)),
+                ("visible", F::Bool(s.visible)),
+                ("z_index", F::Float(s.z_index as f32)),
             ],
             Component::MeshRenderer(m) => vec![
                 ("mesh", F::Text(m.mesh.clone())),
@@ -293,6 +344,31 @@ impl Component {
                 F::Bool(b) => c.active = b,
                 _ => return bad(),
             },
+            (Component::Camera2D(c), "active") => match v {
+                F::Bool(b) => c.active = b,
+                _ => return bad(),
+            },
+            (Component::Camera2D(c), "zoom") => c.zoom = fnum?.clamp(0.01, 100.0),
+            (Component::Camera2D(c), "pixels_per_unit") => c.pixels_per_unit = fnum?.clamp(1.0, 4096.0),
+            (Component::Sprite2D(s), "color") => match v {
+                F::Color(color) => s.color = color,
+                _ => return bad(),
+            },
+            (Component::Sprite2D(s), "size") => match v {
+                F::Vec3(size) if size.is_finite() => s.size = Vec3 { x: size.x.abs(), y: size.y.abs(), z: size.z },
+                _ => return bad(),
+            },
+            (Component::Sprite2D(s), "visible") => match v {
+                F::Bool(b) => s.visible = b,
+                _ => return bad(),
+            },
+            (Component::Sprite2D(s), "z_index") => {
+                let z = fnum?;
+                if z < i32::MIN as f32 || z > i32::MAX as f32 {
+                    return Err("Sprite2D.z_index is out of range".into());
+                }
+                s.z_index = z as i32;
+            }
             (Component::MeshRenderer(m), "mesh") => match v {
                 F::Text(s) => m.mesh = s,
                 _ => return bad(),
@@ -420,6 +496,14 @@ impl Component {
             Component::Camera(c) => {
                 base.with("fov", c.fov).with("near", c.near).with("far", c.far).with("active", c.active)
             }
+            Component::Camera2D(c) => {
+                base.with("active", c.active).with("zoom", c.zoom).with("pixels_per_unit", c.pixels_per_unit)
+            }
+            Component::Sprite2D(s) => base
+                .with("color", s.color.to_hex())
+                .with("size", s.size.to_array())
+                .with("visible", s.visible)
+                .with("z_index", s.z_index as f32),
             Component::MeshRenderer(m) => base
                 .with("mesh", m.mesh.as_str())
                 .with("color", m.color.to_hex())
@@ -529,6 +613,31 @@ impl Component {
                     cam.active = v;
                 }
             }
+            Component::Camera2D(cam) => {
+                if let Some(v) = bool_of("active")? {
+                    cam.active = v;
+                }
+                if let Some(v) = f32_of("zoom")? {
+                    cam.zoom = v.clamp(0.01, 100.0);
+                }
+                if let Some(v) = f32_of("pixels_per_unit")? {
+                    cam.pixels_per_unit = v.clamp(1.0, 4096.0);
+                }
+            }
+            Component::Sprite2D(sprite) => {
+                if let Some(v) = color_of("color")? {
+                    sprite.color = v;
+                }
+                if let Some(v) = vec_of("size")? {
+                    sprite.size = Vec3 { x: v.x.abs(), y: v.y.abs(), z: v.z };
+                }
+                if let Some(v) = bool_of("visible")? {
+                    sprite.visible = v;
+                }
+                if let Some(v) = f32_of("z_index")? {
+                    sprite.z_index = v.clamp(i32::MIN as f32, i32::MAX as f32) as i32;
+                }
+            }
             Component::MeshRenderer(m) => {
                 if let Some(v) = str_of("mesh")? {
                     m.mesh = v;
@@ -628,6 +737,8 @@ pub struct Entity {
     pub parent: Option<EntityId>,
     pub active: bool,
     pub tag: String,
+    /// Named groups used for broad scene queries (Godot-style node groups).
+    pub groups: Vec<String>,
     pub components: Vec<Component>,
 }
 
@@ -640,6 +751,21 @@ impl Entity {
     }
     pub fn has(&self, type_name: &str) -> bool {
         self.get(type_name).is_some()
+    }
+    pub fn add_to_group(&mut self, group: &str) -> bool {
+        if group.trim().is_empty() || self.groups.iter().any(|g| g.as_str() == group) {
+            return false;
+        }
+        self.groups.push(group.to_string());
+        true
+    }
+    pub fn remove_from_group(&mut self, group: &str) -> bool {
+        let old_len = self.groups.len();
+        self.groups.retain(|g| g.as_str() != group);
+        self.groups.len() != old_len
+    }
+    pub fn is_in_group(&self, group: &str) -> bool {
+        self.groups.iter().any(|g| g.as_str() == group)
     }
     pub fn transform(&self) -> Transform {
         match self.get("Transform") {
@@ -736,6 +862,7 @@ impl Scene {
             parent: None,
             active: true,
             tag: String::new(),
+            groups: Vec::new(),
             components: vec![Component::Transform(Transform::default())],
         });
         id
@@ -857,6 +984,7 @@ impl Scene {
                     .with("parent", e.parent.map(Json::from).unwrap_or(Json::Null))
                     .with("active", e.active)
                     .with("tag", e.tag.as_str())
+                    .with("groups", Json::Arr(e.groups.iter().map(|g| Json::from(g.as_str())).collect()))
                     .with("components", Json::Arr(e.components.iter().map(|c| c.to_json()).collect()))
             })
             .collect();
@@ -912,6 +1040,19 @@ impl Scene {
                 Some(Json::Num(n)) => Some(*n as EntityId),
                 Some(_) => return Err(ctx("\"parent\" must be an id or null".into())),
             };
+            let mut groups = Vec::new();
+            if let Some(gs) = ej.get("groups") {
+                let gs = gs.as_array().ok_or_else(|| ctx("\"groups\" must be an array of strings".into()))?;
+                for group in gs {
+                    let group = group.as_str().ok_or_else(|| ctx("\"groups\" must contain only strings".into()))?;
+                    if group.trim().is_empty() {
+                        return Err(ctx("group names cannot be empty".into()));
+                    }
+                    if !groups.iter().any(|g: &String| g.as_str() == group) {
+                        groups.push(group.to_string());
+                    }
+                }
+            }
             let mut components = Vec::new();
             if let Some(cs) = ej.get("components") {
                 let cs = cs.as_array().ok_or_else(|| ctx("\"components\" must be an array".into()))?;
@@ -929,6 +1070,7 @@ impl Scene {
                 parent,
                 active: ej.get("active").and_then(|v| v.as_bool()).unwrap_or(true),
                 tag: ej.get("tag").and_then(|v| v.as_str()).unwrap_or("").to_string(),
+                groups,
                 components,
             });
         }

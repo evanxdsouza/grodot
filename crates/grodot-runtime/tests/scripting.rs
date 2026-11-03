@@ -209,3 +209,47 @@ end
     assert!(matches!(field(&rt, "C", "none"), Value::Nil));
     assert!(matches!(field(&rt, "C", "mesh"), Value::Str(s) if &*s == "cube"));
 }
+
+#[test]
+fn node_paths_and_groups_match_godot_style_apis() {
+    let p = TempProject::new("node_paths_groups");
+    p.write(
+        "scripts/root.gro",
+        r#"
+class Root < Entity
+  function ready()
+    @child_name = self.get_node("Child").name
+    @deep_name = self.get_node("Child/Deep").name
+    @absolute_name = self.get_node("/root/Root/Child").name
+    @parent_is_nil = self.get_parent() == nil
+    @missing = self.get_node_or_null("Missing")
+    @added = self.add_to_group("actors")
+    @duplicate = self.add_to_group("actors")
+    @in_group = self.is_in_group?("actors")
+    @groups_count = self.get_groups().length()
+    @query_count = Scene.get_nodes_in_group("actors").length()
+  end
+end
+"#,
+    );
+    let mut scene = scene_with_scripts(&[("Root", "scripts/root.gro")]);
+    let root = scene.find_by_name("Root").unwrap().id;
+    let child = scene.add_entity("Child");
+    scene.set_parent(child, Some(root)).unwrap();
+    let deep = scene.add_entity("Deep");
+    scene.set_parent(deep, Some(child)).unwrap();
+
+    let mut rt = Runtime::new(scene, Some(p.root.clone()), Default::default());
+    rt.frame(0.016);
+    assert!(errors(&rt).is_empty(), "{:?}", errors(&rt));
+    assert!(matches!(field(&rt, "Root", "child_name"), Value::Str(s) if &*s == "Child"));
+    assert!(matches!(field(&rt, "Root", "deep_name"), Value::Str(s) if &*s == "Deep"));
+    assert!(matches!(field(&rt, "Root", "absolute_name"), Value::Str(s) if &*s == "Child"));
+    assert!(matches!(field(&rt, "Root", "parent_is_nil"), Value::Bool(true)));
+    assert!(matches!(field(&rt, "Root", "missing"), Value::Nil));
+    assert!(matches!(field(&rt, "Root", "added"), Value::Bool(true)));
+    assert!(matches!(field(&rt, "Root", "duplicate"), Value::Bool(false)));
+    assert!(matches!(field(&rt, "Root", "in_group"), Value::Bool(true)));
+    assert!(matches!(field(&rt, "Root", "groups_count"), Value::Number(n) if n == 1.0));
+    assert!(matches!(field(&rt, "Root", "query_count"), Value::Number(n) if n == 1.0));
+}

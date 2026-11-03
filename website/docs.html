@@ -946,9 +946,12 @@ end</code></pre>
     <dt>on_floor?()</dt><dd>True when a dynamic body is resting on something.</dd>
     <dt>apply_impulse(v) apply_force(v)</dt><dd>Push a dynamic body. An impulse changes velocity at once (divided by mass); a force acts over the next physics step.</dd>
     <dt>destroy()</dt><dd>Remove the entity and its children at the end of the frame. <code>on_destroy()</code> runs first.</dd>
+    <dt>queue_free()</dt><dd>Godot-style alias for <code>destroy()</code>; destruction is deferred until the end of the frame.</dd>
+    <dt>add_to_group(name) remove_from_group(name) is_in_group?(name) get_groups()</dt><dd>Manage this entity's persistent group membership.</dd>
     <dt>valid?()</dt><dd>False once the entity is destroyed. Any other use of a destroyed entity is an EngineError.</dd>
     <dt>duplicate()</dt><dd>Copy the entity and its children (scripts included). <span class="r">&rarr; Entity</span></dd>
     <dt>children() find_child(name)</dt><dd></dd>
+    <dt>get_parent() get_node(path) get_node_or_null(path)</dt><dd>Traverse relative child paths such as <code>"Weapons/Sword"</code> and parent paths such as <code>"../Camera"</code>. Absolute paths start with <code>/root/RootNode</code>.</dd>
     <dt>has_component?(name) get_component(name)</dt><dd><code>get_component</code> returns the component or nil.</dd>
     <dt>add_component(name) remove_component(name)</dt><dd>Add or remove at runtime. Transform and Script cannot be removed; scripts cannot be added at runtime (use a prefab).</dd>
     <dt>play_sound()</dt><dd>Play this entity's AudioSource clip.</dd>
@@ -960,6 +963,8 @@ end</code></pre>
     <tr><th>Component</th><th>Fields</th><th>Notes</th></tr>
     <tr><td>Transform</td><td><code>position rotation scale</code></td><td>Every entity has one.</td></tr>
     <tr><td>Camera</td><td><code>field_of_view near_clip far_clip active</code></td><td>The first active camera renders the game. Looks along its <code>-Z</code>.</td></tr>
+    <tr><td>Camera2D</td><td><code>active zoom pixels_per_unit</code></td><td>Orthographic XY camera. One world unit is 64 pixels at the default scale and zoom.</td></tr>
+    <tr><td>Sprite2D</td><td><code>color size visible z_index</code></td><td>Solid-color, alpha-blended rectangle. Transform rotation and scale apply; higher <code>z_index</code> draws on top. Texture assets are planned.</td></tr>
     <tr><td>MeshRenderer</td><td><code>mesh color lit visible</code></td><td>Mesh: <code>cube</code> (1 m), <code>sphere</code> (1 m across), <code>plane</code> (1 m, faces up), <code>cylinder</code> (1 m), <code>capsule</code> (1 m wide, 2 m tall), or a project <code>.obj</code> path. Unlit meshes ignore lights.</td></tr>
     <tr><td>RigidBody</td><td><code>body_type mass velocity gravity</code></td><td><code>"dynamic"</code>: gravity and collisions. <code>"kinematic"</code>: moves by velocity or script, never pushed. <code>"static"</code>: does not move.</td></tr>
     <tr><td>Collider</td><td><code>shape size radius offset sensor friction restitution</code></td><td><code>"box"</code> (size before scale) or <code>"sphere"</code>. A sensor reports touches but does not block. A Collider without a RigidBody is static.</td></tr>
@@ -967,6 +972,7 @@ end</code></pre>
     <tr><td>Script</td><td><code>path enabled</code></td><td>The <code>.gro</code> file whose Entity class is attached.</td></tr>
     <tr><td>Light</td><td><code>color intensity</code></td><td>Directional sunlight shining along the entity's <code>-Z</code>.</td></tr>
   </table></div>
+  <p>For a working 2D scene, open <code>examples/2d-starter</code>. It includes a Camera2D, a backdrop, and layered sprites that you can edit in the scene inspector.</p>
 
   <h3 id="api-input" data-toc="Input">Input</h3>
   <dl class="api">
@@ -992,6 +998,7 @@ end</code></pre>
     <dt>Scene.find(name)</dt><dd>The first entity with that name, or nil.</dd>
     <dt>Scene.find_all(tag)</dt><dd>Every entity whose tag (or name) matches. <span class="r">&rarr; Array</span></dd>
     <dt>Scene.all()</dt><dd>Every entity.</dd>
+    <dt>Scene.get_nodes_in_group(name)</dt><dd>Every live entity in the named group.</dd>
     <dt>Scene.create(name, position = nil)</dt><dd>A new empty entity with a Transform.</dd>
     <dt>Scene.spawn(prefab, position = nil)</dt><dd>Add the entities from a <code>.gprefab</code> file. Their scripts get <code>ready()</code> on the next frame. <span class="r">&rarr; the root Entity</span></dd>
     <dt>Scene.load(path) Scene.reload()</dt><dd>Switch scene at the end of this frame. Every script gets <code>on_destroy()</code> first.</dd>

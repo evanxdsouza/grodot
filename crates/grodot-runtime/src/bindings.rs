@@ -120,6 +120,36 @@ impl EntityHandle {
         }
         Ok(name)
     }
+
+    fn resolve_node_path(&self, path: &str) -> GroResult<Option<EntityId>> {
+        self.with(|w| {
+            if path.is_empty() {
+                return None;
+            }
+            let mut parts = path.split('/').filter(|part| !part.is_empty()).peekable();
+            let mut current = if path.starts_with('/') {
+                let first = parts.next()?;
+                let root_name = if first == "root" { parts.next()? } else { first };
+                w.scene
+                    .entities
+                    .iter()
+                    .find(|e| e.parent.is_none() && e.name.as_str() == root_name)
+                    .map(|e| e.id)?
+            } else {
+                self.id
+            };
+            for part in parts {
+                current = match part {
+                    "." => current,
+                    ".." => w.scene.entity(current)?.parent?,
+                    name => w.scene.children(current).into_iter().find(|child| {
+                        w.scene.entity(*child).map(|e| e.name.as_str() == name).unwrap_or(false)
+                    })?,
+                };
+            }
+            Some(current)
+        })
+    }
 }
 
 impl HostObject for EntityHandle {
@@ -334,13 +364,39 @@ impl HostObject for EntityHandle {
                 let v = self.with(|w| w.scene.world_matrix(self.id).transform_vector(axis).normalized())?;
                 Ok(v3(v))
             })(),
-            "destroy" => (|| {
+            "destroy" | "queue_free" => (|| {
                 argc(0)?;
                 let mut w = self.world.borrow_mut();
                 if w.scene.entity(self.id).is_some() && !w.pending_destroy.contains(&self.id) {
                     w.pending_destroy.push(self.id);
                 }
                 Ok(Value::Nil)
+            })(),
+            "add_to_group" => (|| {
+                argc(1)?;
+                let group = str_arg(args, 0, name)?;
+                if group.trim().is_empty() {
+                    return engine_err("group name cannot be empty");
+                }
+                self.with(|w| Value::Bool(w.scene.entity_mut(self.id).unwrap().add_to_group(&group)))
+            })(),
+            "remove_from_group" => (|| {
+                argc(1)?;
+                let group = str_arg(args, 0, name)?;
+                self.with(|w| Value::Bool(w.scene.entity_mut(self.id).unwrap().remove_from_group(&group)))
+            })(),
+            "is_in_group?" => (|| {
+                argc(1)?;
+                let group = str_arg(args, 0, name)?;
+                self.with(|w| Value::Bool(w.scene.entity(self.id).unwrap().is_in_group(&group)))
+            })(),
+            "get_groups" => (|| {
+                argc(0)?;
+                self.with(|w| {
+                    Value::array(
+                        w.scene.entity(self.id).unwrap().groups.iter().map(|g| Value::str(g)).collect(),
+                    )
+                })
             })(),
             "has_component?" => (|| {
                 argc(1)?;
@@ -432,6 +488,22 @@ impl HostObject for EntityHandle {
                 let ids = w.scene.children(self.id);
                 Value::array(ids.into_iter().map(|c| entity_value(&self.world, c)).collect())
             }),
+            "get_parent" => self.with(|w| {
+                w.scene
+                    .entity(self.id)
+                    .and_then(|e| e.parent)
+                    .map(|id| entity_value(&self.world, id))
+                    .unwrap_or(Value::Nil)
+            }),
+            "get_node" | "get_node_or_null" => (|| {
+                argc(1)?;
+                let path = str_arg(args, 0, name)?;
+                match self.resolve_node_path(&path)? {
+                    Some(id) => Ok(entity_value(&self.world, id)),
+                    None if name == "get_node_or_null" => Ok(Value::Nil),
+                    None => engine_err(format!("node path '{}' was not found from '{}'", path, self.id)),
+                }
+            })(),
             "find_child" => (|| {
                 argc(1)?;
                 let n = str_arg(args, 0, name)?;
@@ -839,6 +911,20 @@ pub fn install(interp: &mut Interpreter, world: &WorldRef, timers: &Rc<RefCell<T
         scene.native("all", 0, Some(0), move |_, _| {
             let wb = w.borrow();
             let ids: Vec<EntityId> = wb.scene.entities.iter().filter(|e| wb.is_alive(e.id)).map(|e| e.id).collect();
+            drop(wb);
+            Ok(Value::array(ids.into_iter().map(|id| entity_value(&w, id)).collect()))
+        });
+        let w = world.clone();
+        scene.native("get_nodes_in_group", 1, Some(1), move |_, a| {
+            let group = str_arg(a, 0, "Scene.get_nodes_in_group")?;
+            let wb = w.borrow();
+            let ids: Vec<EntityId> = wb
+                .scene
+                .entities
+                .iter()
+                .filter(|e| e.is_in_group(&group) && wb.is_alive(e.id))
+                .map(|e| e.id)
+                .collect();
             drop(wb);
             Ok(Value::array(ids.into_iter().map(|id| entity_value(&w, id)).collect()))
         });

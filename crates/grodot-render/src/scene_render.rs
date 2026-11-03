@@ -2,7 +2,7 @@
 
 use crate::canvas::{blend, Canvas, Rect};
 use crate::raster::{self, DrawItem, Lighting, View};
-use grodot_core::math::{Color, Mat4, Vec3};
+use grodot_core::math::{Color, Mat4, Quat, Vec3};
 use grodot_core::mesh::Mesh;
 use grodot_core::scene::{Component, EntityId, Scene, Shape};
 use std::collections::HashMap;
@@ -79,13 +79,24 @@ impl SceneRenderer {
 
     /// View for the scene's active camera.
     pub fn camera_view(scene: &Scene, viewport: Rect) -> Option<View> {
-        let cam_ent = scene
+        if let Some(cam_ent) = scene
             .entities
             .iter()
-            .find(|e| e.camera().map(|c| c.active).unwrap_or(false) && scene.is_active_in_hierarchy(e.id))?;
-        let cam = cam_ent.camera()?;
-        let world = scene.world_matrix(cam_ent.id);
-        Some(view_from_matrix(&world, cam.fov, cam.near, cam.far, viewport))
+            .find(|e| e.camera().map(|c| c.active).unwrap_or(false) && scene.is_active_in_hierarchy(e.id))
+        {
+            let cam = cam_ent.camera()?;
+            let world = scene.world_matrix(cam_ent.id);
+            return Some(view_from_matrix(&world, cam.fov, cam.near, cam.far, viewport));
+        }
+        let cam_ent = scene.entities.iter().find(|e| {
+            matches!(e.get("Camera2D"), Some(Component::Camera2D(c)) if c.active)
+                && scene.is_active_in_hierarchy(e.id)
+        })?;
+        // The 2D pass projects directly onto the canvas. This view only keeps
+        // the existing 3D/editor overlays usable in mixed scenes.
+        let center = scene.world_matrix(cam_ent.id).get_translation();
+        let world = Mat4::from_trs(center + Vec3::Z * 10.0, Quat::IDENTITY, Vec3::ONE);
+        Some(view_from_matrix(&world, 70.0, 0.1, 1000.0, viewport))
     }
 
     pub fn lighting(scene: &Scene, view: &View) -> Lighting {
@@ -184,9 +195,9 @@ impl SceneRenderer {
         }
         if opts.show_camera_icons {
             for e in &scene.entities {
-                if e.has("Camera") || e.has("Light") {
+                if e.has("Camera") || e.has("Camera2D") || e.has("Light") {
                     let world = scene.world_matrix(e.id);
-                    let col = if e.has("Camera") { 0xffffff } else { 0xffe060 };
+                    let col = if e.has("Camera") || e.has("Camera2D") { 0xffffff } else { 0xffe060 };
                     draw_box(canvas, viewport, view, &world, Vec3::splat(-0.2), Vec3::splat(0.2), col, false);
                     let tip = world.transform_point(Vec3::FORWARD * 0.8);
                     raster::draw_line_3d(canvas, viewport, view, world.transform_point(Vec3::ZERO), tip, col, false);
@@ -205,10 +216,79 @@ impl SceneRenderer {
                 draw_box(canvas, viewport, view, &world, lo - pad, hi + pad, 0xffa030, false);
             }
         }
+        self.render_sprites_2d(canvas, viewport, scene);
+    }
+
+    fn render_sprites_2d(&self, canvas: &mut Canvas, viewport: Rect, scene: &Scene) {
+        let camera = scene.entities.iter().find_map(|e| {
+            if !scene.is_active_in_hierarchy(e.id) {
+                return None;
+            }
+            match e.get("Camera2D") {
+                Some(Component::Camera2D(c)) if c.active => {
+                    let world = scene.world_matrix(e.id);
+                    let right = world.transform_vector(Vec3::X).normalized();
+                    let up = world.transform_vector(Vec3::Y).normalized();
+                    let scale = c.pixels_per_unit * c.zoom;
+                    (scale.is_finite() && scale > 0.0).then_some((world.get_translation(), right, up, scale))
+                }
+                _ => None,
+            }
+        });
+        let Some((center, right, up, scale)) = camera else { return };
+        let mut sprites: Vec<(i32, usize, &grodot_core::scene::Sprite2D, Mat4)> = scene
+            .entities
+            .iter()
+            .enumerate()
+            .filter_map(|(order, e)| {
+                if !scene.is_active_in_hierarchy(e.id) {
+                    return None;
+                }
+                match e.get("Sprite2D") {
+                    Some(Component::Sprite2D(sprite)) if sprite.visible => {
+                        Some((sprite.z_index, order, sprite, scene.world_matrix(e.id)))
+                    }
+                    _ => None,
+                }
+            })
+            .collect();
+        sprites.sort_by_key(|(z, order, _, _)| (*z, *order));
+
+        let old_clip = canvas.clip;
+        canvas.set_clip(viewport.intersect(&old_clip));
+        for (_, _, sprite, model) in sprites {
+            let half = Vec3 { x: sprite.size.x * 0.5, y: sprite.size.y * 0.5, z: 0.0 };
+            let corners = [
+                Vec3 { x: -half.x, y: -half.y, z: 0.0 },
+                Vec3 { x: half.x, y: -half.y, z: 0.0 },
+                Vec3 { x: half.x, y: half.y, z: 0.0 },
+                Vec3 { x: -half.x, y: half.y, z: 0.0 },
+            ];
+            let points: Vec<(f32, f32)> = corners
+                .iter()
+                .map(|p| {
+                    let world = model.transform_point(*p);
+                    let relative = world - center;
+                    (
+                        viewport.x as f32 + viewport.w as f32 * 0.5 + relative.dot(right) * scale,
+                        viewport.y as f32 + viewport.h as f32 * 0.5 - relative.dot(up) * scale,
+                    )
+                })
+                .collect();
+            canvas.fill_polygon(
+                &points,
+                sprite.color.to_u32(),
+                (sprite.color.a.clamp(0.0, 1.0) * 255.0).round() as u32,
+            );
+        }
+        canvas.clip = old_clip;
     }
 
     /// Pick the closest entity under a viewport pixel.
     pub fn pick(&mut self, scene: &Scene, view: &View, viewport: Rect, px: f32, py: f32) -> Option<EntityId> {
+        if let Some(id) = pick_sprite_2d(scene, viewport, px, py) {
+            return Some(id);
+        }
         let (origin, dir) = raster::screen_ray(view, viewport, px, py);
         let mut best: Option<(f32, EntityId)> = None;
         for e in &scene.entities {
@@ -217,7 +297,9 @@ impl SceneRenderer {
             }
             let (lo, hi) = match e.mesh().and_then(|m| self.mesh(&m.mesh)) {
                 Some(m) => m.bounds(),
-                None if e.has("Camera") || e.has("Light") => (Vec3::splat(-0.25), Vec3::splat(0.25)),
+                None if e.has("Camera") || e.has("Camera2D") || e.has("Light") => {
+                    (Vec3::splat(-0.25), Vec3::splat(0.25))
+                }
                 None => continue,
             };
             let world = scene.world_matrix(e.id);
@@ -237,6 +319,76 @@ impl SceneRenderer {
         }
         best.map(|(_, id)| id)
     }
+}
+
+fn pick_sprite_2d(scene: &Scene, viewport: Rect, px: f32, py: f32) -> Option<EntityId> {
+    let (camera_id, camera) = scene.entities.iter().find_map(|e| {
+        if !scene.is_active_in_hierarchy(e.id) {
+            return None;
+        }
+        match e.get("Camera2D") {
+            Some(Component::Camera2D(c)) if c.active => Some((e.id, c)),
+            _ => None,
+        }
+    })?;
+    let cam_world = scene.world_matrix(camera_id);
+    let center = cam_world.get_translation();
+    let right = cam_world.transform_vector(Vec3::X).normalized();
+    let up = cam_world.transform_vector(Vec3::Y).normalized();
+    let scale = camera.pixels_per_unit * camera.zoom;
+    if !scale.is_finite() || scale <= 0.0 {
+        return None;
+    }
+    let mut sprites: Vec<(i32, usize, EntityId, Vec<(f32, f32)>)> = scene
+        .entities
+        .iter()
+        .enumerate()
+        .filter_map(|(order, e)| {
+            if !scene.is_active_in_hierarchy(e.id) {
+                return None;
+            }
+            let Some(Component::Sprite2D(sprite)) = e.get("Sprite2D") else { return None };
+            if !sprite.visible {
+                return None;
+            }
+            let model = scene.world_matrix(e.id);
+            let half = Vec3 { x: sprite.size.x * 0.5, y: sprite.size.y * 0.5, z: 0.0 };
+            let corners = [
+                Vec3 { x: -half.x, y: -half.y, z: 0.0 },
+                Vec3 { x: half.x, y: -half.y, z: 0.0 },
+                Vec3 { x: half.x, y: half.y, z: 0.0 },
+                Vec3 { x: -half.x, y: half.y, z: 0.0 },
+            ];
+            let points = corners
+                .iter()
+                .map(|p| {
+                    let relative = model.transform_point(*p) - center;
+                    (
+                        viewport.x as f32 + viewport.w as f32 * 0.5 + relative.dot(right) * scale,
+                        viewport.y as f32 + viewport.h as f32 * 0.5 - relative.dot(up) * scale,
+                    )
+                })
+                .collect();
+            Some((sprite.z_index, order, e.id, points))
+        })
+        .collect();
+    sprites.sort_by_key(|(z, order, _, _)| (*z, *order));
+    sprites
+        .into_iter()
+        .rev()
+        .find_map(|(_, _, id, points)| point_in_polygon(px, py, &points).then_some(id))
+}
+
+fn point_in_polygon(x: f32, y: f32, points: &[(f32, f32)]) -> bool {
+    let mut inside = false;
+    for i in 0..points.len() {
+        let (x0, y0) = points[i];
+        let (x1, y1) = points[(i + 1) % points.len()];
+        if (y0 > y) != (y1 > y) && x < (x1 - x0) * (y - y0) / (y1 - y0) + x0 {
+            inside = !inside;
+        }
+    }
+    inside
 }
 
 fn horizon(bg: Color) -> Color {

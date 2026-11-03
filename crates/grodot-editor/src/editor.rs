@@ -912,7 +912,7 @@ impl Editor {
                 continue;
             }
             let e = scene.entity(id).unwrap();
-            let icon = if e.has("Camera") {
+            let icon = if e.has("Camera") || e.has("Camera2D") {
                 (0xd0d4dc, "C")
             } else if e.has("Light") {
                 (YELLOW, "L")
@@ -1054,6 +1054,7 @@ impl Editor {
             let mut name = e.name.clone();
             let mut active = e.active;
             let mut tag = e.tag.clone();
+            let mut groups = e.groups.join(", ");
             self.ui.label_in(Rect::new(x0, y, label_w, 24), "Name", TEXT_DIM);
             if self.ui.text_field(id_of(&["name", &sid]), Rect::new(x0 + label_w, y, fw - label_w - 30, 24), &mut name)
                 && !name.trim().is_empty()
@@ -1067,6 +1068,17 @@ impl Editor {
             self.ui.label_in(Rect::new(x0, y, label_w, 24), "Tag", TEXT_DIM);
             if self.ui.text_field(id_of(&["tag", &sid]), Rect::new(x0 + label_w, y, fw - label_w, 24), &mut tag) {
                 scene.entity_mut(sel).unwrap().tag = tag.trim().to_string();
+            }
+            y += 30;
+            self.ui.label_in(Rect::new(x0, y, label_w, 24), "Groups", TEXT_DIM);
+            if self.ui.text_field(id_of(&["groups", &sid]), Rect::new(x0 + label_w, y, fw - label_w, 24), &mut groups) {
+                let mut parsed = Vec::new();
+                for group in groups.split(',').map(str::trim).filter(|group| !group.is_empty()) {
+                    if !parsed.iter().any(|known: &String| known.as_str() == group) {
+                        parsed.push(group.to_string());
+                    }
+                }
+                scene.entity_mut(sel).unwrap().groups = parsed;
             }
             y += 30;
             self.ui.label_in(Rect::new(x0, y, fw, 18), &format!("id {}", sel), 0x6b6f77);
@@ -1413,7 +1425,11 @@ impl Editor {
         match popup {
             Popup::None => {}
             Popup::AddEntity => {
-                let items: Vec<String> = ["Empty", "Cube", "Sphere", "Plane", "Cylinder", "Capsule", "Camera", "Light"]
+                let items: Vec<String> = [
+                    "Empty", "Cube", "Sphere", "Plane",
+                    "Cylinder", "Capsule", "Camera", "Light",
+                    "Sprite2D", "Camera2D",
+                ]
                     .iter()
                     .map(|s| s.to_string())
                     .collect();
@@ -1561,6 +1577,13 @@ pub fn create_entity(scene: &mut Scene, kind: &str, at: Vec3) -> EntityId {
     let e = scene.entity_mut(id).unwrap();
     let ground = vec3(at.x.round(), 0.0, at.z.round());
     match kind {
+        "Sprite2D" => {
+            e.add(Component::new_default("Sprite2D").unwrap());
+            e.transform_mut().position = vec3(ground.x, ground.z, 0.0);
+        }
+        "Camera2D" => {
+            e.add(Component::new_default("Camera2D").unwrap());
+        }
         "Cube" | "Sphere" | "Cylinder" | "Capsule" | "Plane" => {
             let mesh = kind.to_lowercase();
             let mut mr = Component::new_default("MeshRenderer").unwrap();

@@ -26,7 +26,9 @@
 
 ## Deferred (in cut order)
 
-* Textures and UV mapping in the rasterizer.
+* Textures and UV mapping in the rasterizer, including texture-backed sprites.
+* 2D physics bodies, collision shapes, and tile maps.
+* Godot signals and signal connections, full NodePath features (unique names and exported paths), and GDScript syntax such as `match`, enums, annotations, and typed declarations.
 * glTF 2.0 model import (OBJ and primitives work today).
 * Rotate and scale gizmos, multi-select, copy/paste between scenes.
 * Gamepad input.
