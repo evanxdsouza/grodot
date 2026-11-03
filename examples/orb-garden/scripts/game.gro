@@ -1,0 +1,66 @@
+# Game rules: collect every orb before the timer runs out.
+import "hud_helpers"
+
+class GameManager < Entity
+  TIME_LIMIT = 90
+
+  function ready()
+    @score = 0
+    @lives = 3
+    @total = Scene.find_all("orb").length()
+    @time_left = TIME_LIMIT
+    @state = :playing
+    Audio.play_music("assets/audio/music.wav", 0.3)
+  end
+
+  function update(delta)
+    if @state == :playing
+      @time_left -= delta
+      if @time_left <= 0
+        finish(:lost)
+      end
+    end
+
+    UI.text("Orbs  #{@score} / #{@total}")
+    UI.text("Lives #{HudHelpers.hearts(@lives)}")
+    UI.text("Time  #{HudHelpers.clock(@time_left)}")
+
+    if @state == :won
+      UI.message("You win!", "Press R to play again")
+    elsif @state == :lost
+      UI.message("Game over", "Press R to try again")
+    end
+
+    if Input.just_pressed("restart")
+      Scene.reload()
+    end
+  end
+
+  function collect_orb()
+    @score += 1
+    if @score >= @total
+      finish(:won)
+    end
+  end
+
+  function lose_life()
+    @lives -= 1
+    if @lives <= 0
+      finish(:lost)
+    end
+  end
+
+  function finish(result)
+    if @state != :playing
+      return
+    end
+    @state = result
+    Audio.stop_music()
+    if result == :won
+      Audio.play("assets/audio/win.wav")
+    else
+      Audio.play("assets/audio/lose.wav")
+    end
+    Scene.find("Player").freeze()
+  end
+end

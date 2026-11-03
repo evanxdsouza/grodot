@@ -1,0 +1,16 @@
+# Small formatting helpers, imported by game.gro.
+module HudHelpers
+  function hearts(count)
+    return "<3 " * Math.max(count, 0)
+  end
+
+  function clock(seconds)
+    s = Math.max(Math.ceil(seconds), 0)
+    minutes = Math.floor(s / 60)
+    rest = s % 60
+    if rest < 10
+      return "#{minutes}:0#{rest}"
+    end
+    return "#{minutes}:#{rest}"
+  end
+end

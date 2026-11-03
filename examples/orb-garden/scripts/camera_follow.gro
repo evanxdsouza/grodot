@@ -1,0 +1,17 @@
+# Smoothly follows the player from above and behind.
+class CameraFollow < Entity
+  OFFSET = Vector3.new(0, 7, 9)
+
+  function ready()
+    @target = Scene.find("Player")
+  end
+
+  function update(delta)
+    if @target == nil or not @target.valid?()
+      return
+    end
+    goal = @target.position + OFFSET
+    self.position = self.position.lerp(goal, Math.min(1, delta * 5))
+    self.look_at(@target.position + Vector3.new(0, 1, 0))
+  end
+end

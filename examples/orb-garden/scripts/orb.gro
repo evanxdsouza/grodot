@@ -1,0 +1,21 @@
+# A collectible orb: bobs up and down, spins, and is collected on touch.
+class Orb < Entity
+  function ready()
+    @base_y = self.position.y
+    @phase = Math.random() * 6.28
+  end
+
+  function update(delta)
+    @phase += delta * 2
+    self.position = self.position.with_y(@base_y + Math.sin(@phase) * 0.15)
+    self.rotate(Vector3.new(0, 90 * delta, 0))
+  end
+
+  function on_collision(other)
+    if other.tag == "player"
+      Audio.play("assets/audio/pickup.wav")
+      Scene.find("GameManager").collect_orb()
+      destroy()
+    end
+  end
+end

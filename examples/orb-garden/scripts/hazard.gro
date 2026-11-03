@@ -1,0 +1,21 @@
+# A sliding hazard. Touching it sends the player back to the start.
+class Hazard < Entity
+  RANGE = 3
+  SPEED = 1.5
+
+  function ready()
+    @origin = self.position
+    @t = 0
+  end
+
+  function update(delta)
+    @t += delta
+    self.position = @origin + Vector3.new(Math.sin(@t * SPEED) * RANGE, 0, 0)
+  end
+
+  function on_collision(other)
+    if other.tag == "player"
+      other.hurt()
+    end
+  end
+end

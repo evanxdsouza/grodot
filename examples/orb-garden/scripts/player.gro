@@ -1,0 +1,50 @@
+# The player: moves with WASD / arrow keys, jumps with Space.
+class Player < Entity
+  SPEED = 6
+  JUMP_SPEED = 7.5
+
+  function ready()
+    @spawn = self.position
+    @alive = true
+  end
+
+  function update(delta)
+    if not @alive
+      return
+    end
+
+    # Build a direction from the input actions defined in grodot.toml.
+    direction = Vector3.new(Input.axis("move_left", "move_right"), 0, Input.axis("move_forward", "move_back"))
+    if direction.length() > 0
+      direction = direction.normalized()
+      self.look_at(self.position + direction)
+    end
+
+    # Keep the vertical speed (gravity), replace the horizontal speed.
+    self.velocity = Vector3.new(direction.x * SPEED, self.velocity.y, direction.z * SPEED)
+
+    if Input.just_pressed("jump") and self.on_floor?()
+      self.velocity = self.velocity.with_y(JUMP_SPEED)
+      Audio.play("assets/audio/jump.wav", 0.6)
+    end
+
+    if self.position.y < -10
+      hurt()
+    end
+  end
+
+  function hurt()
+    if not @alive
+      return
+    end
+    Audio.play("assets/audio/hurt.wav")
+    self.position = @spawn
+    self.velocity = Vector3.ZERO
+    Scene.find("GameManager").lose_life()
+  end
+
+  function freeze()
+    @alive = false
+    self.velocity = Vector3.ZERO
+  end
+end

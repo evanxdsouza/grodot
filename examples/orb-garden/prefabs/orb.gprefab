@@ -1,0 +1,64 @@
+{
+  "scene_version": 1,
+  "name": "Orb",
+  "entities": [
+    {
+      "id": 1,
+      "name": "Orb",
+      "parent": null,
+      "active": true,
+      "tag": "orb",
+      "components": [
+        {
+          "type": "Transform",
+          "position": [
+            0,
+            1,
+            0
+          ],
+          "rotation": [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "scale": [
+            0.5,
+            0.5,
+            0.5
+          ]
+        },
+        {
+          "type": "MeshRenderer",
+          "mesh": "sphere",
+          "color": "#ffd23f",
+          "lit": false,
+          "visible": true
+        },
+        {
+          "type": "Collider",
+          "shape": "sphere",
+          "size": [
+            1,
+            1,
+            1
+          ],
+          "radius": 1.0,
+          "offset": [
+            0,
+            0,
+            0
+          ],
+          "sensor": true,
+          "friction": 0.5,
+          "restitution": 0
+        },
+        {
+          "type": "Script",
+          "path": "scripts/orb.gro",
+          "enabled": true
+        }
+      ]
+    }
+  ]
+}
