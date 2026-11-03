@@ -315,13 +315,16 @@ fn shadow_disc() -> Vec<Vec3> {
 
 fn draw_shadow(canvas: &mut Canvas, viewport: Rect, view: &View, disc: &[Vec3], model: Mat4, strength: f32) {
     // Project the disc outline and fill it with a darkening blend (scanline polygon).
-    let pts: Vec<(f32, f32)> = disc
+    let pd: Vec<(f32, f32, f32)> = disc
         .iter()
-        .filter_map(|p| raster::project(view, viewport, model.transform_point(*p)))
+        .filter_map(|p| raster::project_depth(view, viewport, model.transform_point(*p)))
         .collect();
-    if pts.len() < disc.len() {
+    if pd.len() < disc.len() {
         return;
     }
+    let pts: Vec<(f32, f32)> = pd.iter().map(|p| (p.0, p.1)).collect();
+    // Only darken pixels that are not in front of the shadow plane (occluders keep their colour).
+    let min_lin = pd.iter().map(|p| raster::linear_depth(view, p.2)).fold(f32::INFINITY, f32::min) - 0.15;
     let min_y = pts.iter().map(|p| p.1).fold(f32::INFINITY, f32::min).max(viewport.y as f32) as i32;
     let max_y = pts.iter().map(|p| p.1).fold(f32::NEG_INFINITY, f32::max).min(viewport.bottom() as f32 - 1.0) as i32;
     let alpha = (strength.clamp(0.0, 1.0) * 255.0) as u32;
@@ -349,6 +352,9 @@ fn draw_shadow(canvas: &mut Canvas, viewport: Rect, view: &View, disc: &[Vec3], 
             let dy = (y as f32 + 0.5 - cy) / ry;
             let fall = (1.0 - (dx * dx + dy * dy)).clamp(0.0, 1.0);
             let i = y as usize * canvas.width + x as usize;
+            if raster::linear_depth(view, canvas.depth[i]) < min_lin {
+                continue;
+            }
             canvas.color[i] = blend(canvas.color[i], 0x000000, (alpha as f32 * fall) as u32);
         }
     }

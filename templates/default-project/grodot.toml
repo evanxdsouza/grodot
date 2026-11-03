@@ -1,0 +1,22 @@
+[project]
+name = "{{NAME}}"
+version = "0.1.0"
+engine = "grodot"
+config_version = 1
+
+[game]
+main_scene = "scenes/main.gscene"
+
+[window]
+width = 1280
+height = 720
+title = "{{NAME}}"
+
+# Input actions: action = "Key, OtherKey". Key names: A-Z, 0-9, Space, Enter,
+# Escape, Tab, Shift, Ctrl, Up, Down, Left, Right, MouseLeft, MouseRight.
+[input]
+move_forward = "W, Up"
+move_back = "S, Down"
+move_left = "A, Left"
+move_right = "D, Right"
+jump = "Space"

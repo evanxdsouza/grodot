@@ -1,0 +1,171 @@
+{
+  "scene_version": 1,
+  "name": "Main",
+  "environment": {
+    "background": "#79a8e0",
+    "ambient": 0.45
+  },
+  "entities": [
+    {
+      "id": 1,
+      "name": "Camera",
+      "parent": null,
+      "active": true,
+      "tag": "",
+      "components": [
+        {
+          "type": "Transform",
+          "position": [
+            0,
+            5,
+            9
+          ],
+          "rotation": [
+            -0.25881904,
+            0,
+            0,
+            0.9659258
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        {
+          "type": "Camera",
+          "fov": 60,
+          "near": 0.1,
+          "far": 300,
+          "active": true
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "name": "Sun",
+      "parent": null,
+      "active": true,
+      "tag": "",
+      "components": [
+        {
+          "type": "Transform",
+          "position": [
+            0,
+            8,
+            0
+          ],
+          "rotation": [
+            -0.3696438,
+            0.2391176,
+            0.1022011,
+            0.8923991
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        {
+          "type": "Light",
+          "color": "#fff4e0",
+          "intensity": 1
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "name": "Ground",
+      "parent": null,
+      "active": true,
+      "tag": "",
+      "components": [
+        {
+          "type": "Transform",
+          "position": [
+            0,
+            -0.5,
+            0
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            20,
+            1,
+            20
+          ]
+        },
+        {
+          "type": "MeshRenderer",
+          "mesh": "cube",
+          "color": "#5fae5a",
+          "lit": true,
+          "visible": true
+        },
+        {
+          "type": "Collider",
+          "shape": "box",
+          "size": [
+            1,
+            1,
+            1
+          ],
+          "radius": 0.5,
+          "offset": [
+            0,
+            0,
+            0
+          ],
+          "sensor": false,
+          "friction": 0.5,
+          "restitution": 0
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "name": "Player",
+      "parent": null,
+      "active": true,
+      "tag": "player",
+      "components": [
+        {
+          "type": "Transform",
+          "position": [
+            0,
+            0.5,
+            0
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        {
+          "type": "MeshRenderer",
+          "mesh": "cube",
+          "color": "#3d7bd9",
+          "lit": true,
+          "visible": true
+        },
+        {
+          "type": "Script",
+          "path": "scripts/player.gro",
+          "enabled": true
+        }
+      ]
+    }
+  ]
+}

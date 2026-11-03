@@ -301,8 +301,8 @@ pub fn pack(r: f32, g: f32, b: f32) -> Rgb {
     // Simple filmic-ish tone curve keeps bright highlights from clipping harshly.
     let tc = |v: f32| {
         let v = v.max(0.0);
-        let v = v / (1.0 + 0.15 * v);
-        ((v * 1.15).min(1.0) * 255.0 + 0.5) as u32
+        let v = v / (1.0 + 0.3 * v) * 1.15;
+        (v.min(1.0) * 255.0 + 0.5) as u32
     };
     (tc(r) << 16) | (tc(g) << 8) | tc(b)
 }
@@ -369,6 +369,26 @@ pub fn draw_line_3d(canvas: &mut Canvas, viewport: Rect, view: &View, a: Vec3, b
         }
     }
     canvas.clip = old_clip;
+}
+
+/// Project a world point; returns pixel coordinates and NDC depth.
+pub fn project_depth(view: &View, viewport: Rect, p: Vec3) -> Option<(f32, f32, f32)> {
+    let c = view.view_proj().transform4(p);
+    if c.w <= 1e-4 {
+        return None;
+    }
+    let iw = 1.0 / c.w;
+    Some((
+        viewport.x as f32 + (c.x * iw * 0.5 + 0.5) * viewport.w as f32,
+        viewport.y as f32 + (1.0 - (c.y * iw * 0.5 + 0.5)) * viewport.h as f32,
+        c.z * iw,
+    ))
+}
+
+/// Convert NDC depth (-1..1) to linear view distance.
+pub fn linear_depth(view: &View, z: f32) -> f32 {
+    let (n, f) = (view.near.max(0.01), view.far.max(view.near + 0.1));
+    2.0 * n * f / (f + n - z * (f - n))
 }
 
 /// Project a world point to viewport pixel coordinates (None if behind the camera).

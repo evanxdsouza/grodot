@@ -1,0 +1,19 @@
+# Your first Groscript script!
+# It moves this entity with the arrow keys / WASD and spins it with Space.
+class Player < Entity
+  SPEED = 4
+
+  function ready()
+    print("Hello from #{self.name}!")
+  end
+
+  function update(delta)
+    x = Input.axis("move_left", "move_right")
+    z = Input.axis("move_forward", "move_back")
+    self.translate(Vector3.new(x, 0, z) * SPEED * delta)
+
+    if Input.down("jump")
+      self.rotate(Vector3.new(0, 180 * delta, 0))
+    end
+  end
+end

@@ -55,6 +55,7 @@ pub struct Interpreter {
     /// Arbitrary host data, e.g. the engine world.
     pub user_data: Option<Rc<dyn std::any::Any>>,
     rng_state: u64,
+    repl_locals: Option<HashMap<Rc<str>, Value>>,
 }
 
 impl Default for Interpreter {
@@ -80,6 +81,7 @@ impl Interpreter {
             loading: Vec::new(),
             user_data: None,
             rng_state: 0x2545_F491_4F6C_DD1D,
+            repl_locals: None,
         };
         crate::builtins::install(&mut it);
         it
@@ -186,9 +188,20 @@ impl Interpreter {
         self.run_source(&path.display().to_string(), &src)
     }
 
+    /// Like [`Interpreter::run_source`], but top-level variables survive between calls (for a REPL).
+    pub fn eval_repl(&mut self, src: &str) -> GroResult<Value> {
+        if self.repl_locals.is_none() {
+            self.repl_locals = Some(HashMap::new());
+        }
+        self.steps = 0;
+        self.run_source("<repl>", src)
+    }
+
     fn run_program(&mut self, stmts: &[Stmt], file: Rc<str>, source: Rc<str>) -> GroResult<Value> {
+        let use_repl = &*file == "<repl>" && self.repl_locals.is_some();
+        let locals = if use_repl { self.repl_locals.take().unwrap() } else { HashMap::new() };
         self.frames.push(Frame {
-            locals: HashMap::new(),
+            locals,
             self_val: Value::Nil,
             module: None,
             class: None,
@@ -217,7 +230,10 @@ impl Interpreter {
                 }
             }
         }
-        self.frames.pop();
+        let frame = self.frames.pop();
+        if use_repl {
+            self.repl_locals = frame.map(|f| f.locals);
+        }
         match result {
             Ok(()) => Ok(last),
             Err(Ctrl::Error(mut e)) => {

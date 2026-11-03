@@ -464,7 +464,10 @@ impl Component {
                     t.position = v;
                 }
                 if let Some(q) = arr_of("rotation", 4)? {
-                    t.rotation = Quat { x: q[0], y: q[1], z: q[2], w: q[3] }.normalized();
+                    let q = Quat { x: q[0], y: q[1], z: q[2], w: q[3] };
+                    let len2 = q.x * q.x + q.y * q.y + q.z * q.z + q.w * q.w;
+                    // Keep stored values bit-exact when they are already unit length.
+                    t.rotation = if (len2 - 1.0).abs() > 1e-5 { q.normalized() } else { q };
                 }
                 if let Some(v) = vec_of("rotation_degrees")? {
                     t.rotation = Quat::from_euler_deg(v);
