@@ -9,6 +9,8 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use std::rc::Rc;
 
+type SpritePick = (i32, usize, EntityId, Vec<(f32, f32)>);
+
 #[derive(Debug, Clone, Default)]
 pub struct RenderOptions {
     pub grid: bool,
@@ -338,7 +340,7 @@ fn pick_sprite_2d(scene: &Scene, viewport: Rect, px: f32, py: f32) -> Option<Ent
     if !scale.is_finite() || scale <= 0.0 {
         return None;
     }
-    let mut sprites: Vec<(i32, usize, EntityId, Vec<(f32, f32)>)> = scene
+    let mut sprites: Vec<SpritePick> = scene
         .entities
         .iter()
         .enumerate()
