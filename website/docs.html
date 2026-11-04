@@ -948,6 +948,8 @@ end</code></pre>
     <dt>destroy()</dt><dd>Remove the entity and its children at the end of the frame. <code>on_destroy()</code> runs first.</dd>
     <dt>queue_free()</dt><dd>Godot-style alias for <code>destroy()</code>; destruction is deferred until the end of the frame.</dd>
     <dt>add_to_group(name) remove_from_group(name) is_in_group?(name) get_groups()</dt><dd>Manage this entity's persistent group membership.</dd>
+    <dt>connect(signal, target, method) disconnect(signal, target, method) is_connected?(signal, target, method)</dt><dd>Connect a named signal to a method on another entity. Connections are unique per source, signal, target, and method.</dd>
+    <dt>emit_signal(signal, args...)</dt><dd>Queue the signal and pass its arguments to connected methods. Runtime signals are currently dynamic; scripts do not declare them yet.</dd>
     <dt>valid?()</dt><dd>False once the entity is destroyed. Any other use of a destroyed entity is an EngineError.</dd>
     <dt>duplicate()</dt><dd>Copy the entity and its children (scripts included). <span class="r">&rarr; Entity</span></dd>
     <dt>children() find_child(name)</dt><dd></dd>
@@ -1147,7 +1149,7 @@ Packaged examples/orb-garden/builds/orb-garden-0.1.0-linux-x86_64.tar.gz</pre>
     <tr><td><code>grodot-editor</code></td><td>Immediate-mode UI, the editor, Play mode, the standalone player.</td></tr>
     <tr><td><code>grodot-cli</code></td><td>The <code>grodot</code> executable and packaging.</td></tr>
   </table></div>
-  <p>Frame order in the runtime: attach newly spawned scripts, run physics in fixed steps (each followed by collision callbacks and <code>fixed_update</code>), call <code>update</code>, fire timers, destroy entities, switch scenes, then clear per-frame input. Coordinates are right-handed with +Y up and -Z forward; 1 unit is 1 metre.</p>
+  <p>Frame order in the runtime: attach newly spawned scripts, run physics in fixed steps (each followed by collision callbacks and <code>fixed_update</code>), call <code>update</code>, fire timers, deliver queued signals, destroy entities, switch scenes, then clear per-frame input. Signals emitted during <code>ready()</code> are delivered after all ready callbacks. Coordinates are right-handed with +Y up and -Z forward; 1 unit is 1 metre.</p>
   <p>Design decisions, including why Grodot has no third-party dependencies, are in <a href="https://github.com/evanxdsouza/grodot/blob/main/docs/DECISIONS.md">docs/DECISIONS.md</a>. Grodot is an independent project and is not affiliated with or endorsed by the Godot Foundation.</p>
 </section>
 

@@ -5,7 +5,7 @@
 //! services as native modules (`Input`, `Time`, `Scene`, `Audio`, ...).
 
 use crate::physics;
-use crate::world::{AudioCmd, LogLevel, World};
+use crate::world::{AudioCmd, LogLevel, SignalConnection, SignalEvent, World};
 use grodot_core::math::{Color, Quat, Vec3};
 use grodot_core::scene::{BodyType, Component, EntityId, FieldValue, Scene, COMPONENT_TYPES};
 use groscript::builtins::{num_arg, str_arg, vec3_arg};
@@ -368,6 +368,71 @@ impl HostObject for EntityHandle {
                 if w.scene.entity(self.id).is_some() && !w.pending_destroy.contains(&self.id) {
                     w.pending_destroy.push(self.id);
                 }
+                Ok(Value::Nil)
+            })(),
+            "connect" => (|| {
+                if args.len() != 3 {
+                    return Err(GroError::new(ErrorKind::Type, "connect() expects a signal, target entity and method name"));
+                }
+                let signal = str_arg(args, 0, name)?;
+                let target = entity_id_of(&args[1])
+                    .ok_or_else(|| GroError::new(ErrorKind::Type, "connect() target must be an Entity"))?;
+                let method = str_arg(args, 2, name)?;
+                if signal.trim().is_empty() || method.trim().is_empty() {
+                    return engine_err("signal and method names cannot be empty");
+                }
+                let mut w = self.world.borrow_mut();
+                if !w.is_alive(self.id) {
+                    drop(w);
+                    return Err(self.dead());
+                }
+                if !w.is_alive(target) {
+                    return engine_err(format!("connect() target entity {} is not alive", target));
+                }
+                let connection = SignalConnection { source: self.id, signal: signal.to_string(), target, method: method.to_string() };
+                if w.signal_connections.contains(&connection) {
+                    Ok(Value::Bool(false))
+                } else {
+                    w.signal_connections.push(connection);
+                    Ok(Value::Bool(true))
+                }
+            })(),
+            "disconnect" | "is_connected?" => (|| {
+                if args.len() != 3 {
+                    return Err(GroError::new(ErrorKind::Type, format!("{}() expects a signal, target and method", name)));
+                }
+                let signal = str_arg(args, 0, name)?;
+                let target = entity_id_of(&args[1])
+                    .ok_or_else(|| GroError::new(ErrorKind::Type, format!("{}() target must be an Entity", name)))?;
+                let method = str_arg(args, 2, name)?;
+                let mut w = self.world.borrow_mut();
+                if !w.is_alive(self.id) {
+                    drop(w);
+                    return Err(self.dead());
+                }
+                let connection = SignalConnection { source: self.id, signal: signal.to_string(), target, method: method.to_string() };
+                if name == "is_connected?" {
+                    Ok(Value::Bool(w.signal_connections.contains(&connection)))
+                } else {
+                    let count = w.signal_connections.len();
+                    w.signal_connections.retain(|c| c != &connection);
+                    Ok(Value::Bool(w.signal_connections.len() != count))
+                }
+            })(),
+            "emit_signal" => (|| {
+                if args.is_empty() {
+                    return Err(GroError::new(ErrorKind::Type, "emit_signal() expects a signal name"));
+                }
+                let signal = str_arg(args, 0, name)?;
+                if signal.trim().is_empty() {
+                    return engine_err("signal name cannot be empty");
+                }
+                let mut w = self.world.borrow_mut();
+                if !w.is_alive(self.id) {
+                    drop(w);
+                    return Err(self.dead());
+                }
+                w.signal_events.push_back(SignalEvent { source: self.id, signal: signal.to_string(), args: args[1..].to_vec() });
                 Ok(Value::Nil)
             })(),
             "add_to_group" => (|| {

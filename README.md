@@ -56,7 +56,7 @@ grodot run examples/orb-garden   # play the sample game
 | --- | --- |
 | **Editor** | Viewport with orbit camera and move gizmo, hierarchy with drag-to-parent, inspector for every component, asset browser, console, undo/redo, Play/Stop on an isolated copy of the scene. |
 | **Groscript** | Dynamically typed, `end`-terminated blocks, classes with single inheritance, modules and imports, arrays, hashes, symbols, string interpolation, vectors and colours. Errors show the file, line, a caret and the call stack. |
-| **Runtime** | Entity/component scenes, lifecycle callbacks (`ready`, `update`, `fixed_update`, `on_collision`, ...), timers, prefabs, scene loading, node paths, named groups, `queue_free()`, HUD text. Script errors disable one script, never the editor. |
+| **Runtime** | Entity/component scenes, lifecycle callbacks (`ready`, `update`, `fixed_update`, `on_collision`, ...), timers, named signals, prefabs, scene loading, node paths, named groups, `queue_free()`, HUD text. Script errors disable one script, never the editor. |
 | **Rendering** | Multithreaded software rasterizer: depth buffer, Gouraud lighting, fog, blob shadows, primitives and `.obj` meshes. Runs anywhere, including headless CI. |
 | **2D** | `Camera2D` with zoom and world scale, colored/alpha-blended `Sprite2D` rectangles, transform hierarchy, rotation, and z ordering. See `examples/2d-starter`. |
 | **Physics** | Fixed-step boxes and spheres: dynamic, kinematic and static bodies, sensors, collision enter/exit events, raycasts, `on_floor?()`. |

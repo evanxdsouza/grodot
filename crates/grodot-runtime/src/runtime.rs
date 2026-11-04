@@ -75,6 +75,7 @@ impl Runtime {
         let ids: Vec<EntityId> = self.world.borrow().scene.entities.iter().map(|e| e.id).collect();
         self.attach(&ids);
         self.call_ready();
+        self.dispatch_signals();
     }
 
     pub fn is_started(&self) -> bool {
@@ -251,6 +252,7 @@ impl Runtime {
             self.call(i, "update", vec![Value::Number(dt as f64)]);
         }
         self.run_timers();
+        self.dispatch_signals();
         self.process_destroys();
         self.process_scene_load();
         self.world.borrow_mut().input.end_frame();
@@ -279,6 +281,42 @@ impl Runtime {
                     let ov = self.world.borrow().script_objects.get(&other).cloned();
                     let arg = ov.unwrap_or_else(|| entity_value(&self.world, other));
                     self.call(idx, method, vec![arg]);
+                }
+            }
+        }
+    }
+
+    fn dispatch_signals(&mut self) {
+        const MAX_DELIVERIES_PER_FRAME: usize = 10_000;
+        let mut deliveries = 0;
+        loop {
+            let (event, connections) = {
+                let mut w = self.world.borrow_mut();
+                let Some(event) = w.signal_events.pop_front() else { break };
+                let connections = w
+                    .signal_connections
+                    .iter()
+                    .filter(|c| c.source == event.source && c.signal == event.signal)
+                    .cloned()
+                    .collect::<Vec<_>>();
+                (event, connections)
+            };
+            if !self.world.borrow().is_alive(event.source) {
+                continue;
+            }
+            for connection in connections {
+                if deliveries >= MAX_DELIVERIES_PER_FRAME {
+                    let mut w = self.world.borrow_mut();
+                    w.signal_events.clear();
+                    w.log.warn("signal delivery limit reached; remaining signals were dropped");
+                    return;
+                }
+                if !self.world.borrow().is_alive(connection.target) {
+                    continue;
+                }
+                if let Some(idx) = self.index_of(connection.target) {
+                    self.call(idx, &connection.method, event.args.clone());
+                    deliveries += 1;
                 }
             }
         }
@@ -344,6 +382,8 @@ impl Runtime {
                     w.grounded.remove(eid);
                 }
                 w.contacts.retain(|(a, b)| !ids.contains(a) && !ids.contains(b));
+                w.signal_connections.retain(|c| !ids.contains(&c.source) && !ids.contains(&c.target));
+                w.signal_events.retain(|e| !ids.contains(&e.source));
                 drop(w);
                 self.scripts.retain(|s| !ids.contains(&s.entity));
                 self.timers.borrow_mut().list.retain(|t| t.entity.map(|e| !ids.contains(&e)).unwrap_or(true));
@@ -368,6 +408,8 @@ impl Runtime {
             let mut w = self.world.borrow_mut();
             w.scene = scene;
             w.scene_path = Some(path);
+            w.signal_connections.clear();
+            w.signal_events.clear();
             w.project_root = root;
             w.contacts.clear();
             w.grounded.clear();

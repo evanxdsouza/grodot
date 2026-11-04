@@ -2,7 +2,9 @@
 
 use grodot_core::math::{Color, Vec3};
 use grodot_core::scene::{EntityId, Scene};
+use groscript::Value;
 use std::collections::{BTreeMap, HashMap, HashSet};
+use std::collections::VecDeque;
 use std::path::PathBuf;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -207,6 +209,20 @@ pub enum CollisionKind {
     Exit,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SignalConnection {
+    pub source: EntityId,
+    pub signal: String,
+    pub target: EntityId,
+    pub method: String,
+}
+
+pub struct SignalEvent {
+    pub source: EntityId,
+    pub signal: String,
+    pub args: Vec<Value>,
+}
+
 pub struct World {
     pub scene: Scene,
     pub project_root: Option<PathBuf>,
@@ -225,6 +241,9 @@ pub struct World {
     pub contacts: HashSet<(EntityId, EntityId)>,
     pub grounded: HashSet<EntityId>,
     pub collision_events: Vec<(EntityId, EntityId, CollisionKind)>,
+    /// Runtime signal connections and emitted events, delivered after the current script callback phase.
+    pub signal_connections: Vec<SignalConnection>,
+    pub signal_events: VecDeque<SignalEvent>,
     /// Forces accumulated by scripts for the next physics step.
     pub forces: HashMap<EntityId, Vec3>,
     /// Script objects attached to entities (for `other.health` style access).
@@ -251,6 +270,8 @@ impl World {
             contacts: HashSet::new(),
             grounded: HashSet::new(),
             collision_events: Vec::new(),
+            signal_connections: Vec::new(),
+            signal_events: VecDeque::new(),
             forces: HashMap::new(),
             script_objects: HashMap::new(),
             scene_path: None,

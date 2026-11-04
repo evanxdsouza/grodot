@@ -253,3 +253,63 @@ end
     assert!(matches!(field(&rt, "Root", "groups_count"), Value::Number(n) if n == 1.0));
     assert!(matches!(field(&rt, "Root", "query_count"), Value::Number(n) if n == 1.0));
 }
+
+#[test]
+fn named_signals_connect_emit_and_disconnect() {
+    let p = TempProject::new("signals");
+    p.write(
+        "scripts/emitter.gro",
+        r#"
+class Emitter < Entity
+  function ready()
+    @receiver = Scene.find("Receiver")
+    @connected = self.connect("value_changed", @receiver, "on_value_changed")
+    @connected_again = self.connect("value_changed", @receiver, "on_value_changed")
+    @is_connected = self.is_connected?("value_changed", @receiver, "on_value_changed")
+    self.emit_signal("value_changed", 42, "hello")
+  end
+
+  function update(delta)
+    if @connected and @disconnected == nil
+      @disconnected = self.disconnect("value_changed", @receiver, "on_value_changed")
+      @is_connected_after = self.is_connected?("value_changed", @receiver, "on_value_changed")
+      self.emit_signal("value_changed", 99, "ignored")
+    end
+  end
+end
+"#,
+    );
+    p.write(
+        "scripts/receiver.gro",
+        r#"
+class Receiver < Entity
+  function ready()
+    @value = 0
+    @label = ""
+  end
+
+  function on_value_changed(value, label)
+    @value = value
+    @label = label
+  end
+end
+"#,
+    );
+    let mut rt = Runtime::new(
+        scene_with_scripts(&[("Emitter", "scripts/emitter.gro"), ("Receiver", "scripts/receiver.gro")]),
+        Some(p.root.clone()),
+        Default::default(),
+    );
+    rt.start();
+    assert!(errors(&rt).is_empty(), "{:?}", errors(&rt));
+    assert!(matches!(field(&rt, "Emitter", "connected"), Value::Bool(true)));
+    assert!(matches!(field(&rt, "Emitter", "connected_again"), Value::Bool(false)));
+    assert!(matches!(field(&rt, "Emitter", "is_connected"), Value::Bool(true)));
+    assert!(matches!(field(&rt, "Receiver", "value"), Value::Number(n) if n == 42.0));
+    assert!(matches!(field(&rt, "Receiver", "label"), Value::Str(s) if &*s == "hello"));
+
+    rt.frame(0.016);
+    assert!(matches!(field(&rt, "Emitter", "disconnected"), Value::Bool(true)));
+    assert!(matches!(field(&rt, "Emitter", "is_connected_after"), Value::Bool(false)));
+    assert!(matches!(field(&rt, "Receiver", "value"), Value::Number(n) if n == 42.0));
+}
