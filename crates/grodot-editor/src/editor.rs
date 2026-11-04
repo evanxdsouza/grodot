@@ -75,6 +75,8 @@ pub enum Action {
     OpenExternal(String, u32),
     NewScript(EntityId),
     PlayClip(String),
+    /// Create an entity showing a model (or mesh) at a viewport pixel.
+    PlaceModel(String, (f32, f32)),
     SpawnPrefab(String),
 }
 
@@ -115,6 +117,7 @@ pub struct Editor {
     pub show_colliders: bool,
     gizmo: Option<Gizmo>,
     drag_entity: Option<(EntityId, (f32, f32))>,
+    drag_asset: Option<(String, (f32, f32))>,
     asset_selected: Option<String>,
     fps: f32,
     close_requested_at: Option<f32>,
@@ -166,6 +169,7 @@ impl Editor {
             show_colliders: false,
             gizmo: None,
             drag_entity: None,
+            drag_asset: None,
             asset_selected: None,
             fps: 60.0,
             close_requested_at: None,
@@ -362,6 +366,21 @@ impl Editor {
         self.draw_toolbar(Rect::new(0, 0, w, TOOLBAR_H), &mut actions);
         self.draw_status(Rect::new(0, h - STATUS_H, w, STATUS_H));
         self.draw_popup(&mut actions);
+        // Dragging a model from the asset browser into the viewport places it there.
+        if let Some((path, start)) = self.drag_asset.clone() {
+            let (mx, my) = self.ui.input.mouse;
+            let moved = (mx - start.0).abs() + (my - start.1).abs() > 6.0;
+            if moved && self.ui.input.left_down {
+                let label = format!("place {}", path.rsplit('/').next().unwrap_or(&path));
+                self.ui.canvas.text_shadow(mx as i32 + 12, my as i32 + 4, &label, 0xffffff, FontId::Ui);
+            }
+            if !self.ui.input.left_down {
+                if moved && viewport.contains(mx as i32, my as i32) && self.play.is_none() {
+                    actions.push(Action::PlaceModel(path, (mx, my)));
+                }
+                self.drag_asset = None;
+            }
+        }
 
         // Release game keys after the frame so just_pressed/just_released work.
         if let Some(rt) = &self.play {
@@ -495,6 +514,41 @@ impl Editor {
             }
             Action::OpenExternal(path, line) => open_external(&self.project, &path, line, &mut self.log),
             Action::NewScript(id) => self.new_script(id),
+            Action::PlaceModel(path, (px, py)) => {
+                if self.play.is_some() {
+                    return self.set_status("Stop the game to edit the scene");
+                }
+                let vp = self.layout().3;
+                let view = self.camera.view(vp);
+                let (o, d) = raster::screen_ray(&view, vp, px, py);
+                // Drop onto the ground plane (y = 0), or in front of the camera when looking up.
+                let at = if d.y < -1e-4 { o + d * (-o.y / d.y) } else { self.camera.target };
+                let name: String = path
+                    .rsplit('/')
+                    .next()
+                    .unwrap_or("Model")
+                    .split('.')
+                    .next()
+                    .unwrap_or("Model")
+                    .split(['_', '-'])
+                    .map(|w| {
+                        let mut c = w.chars();
+                        c.next().map(|f| f.to_ascii_uppercase().to_string() + c.as_str()).unwrap_or_default()
+                    })
+                    .collect::<Vec<_>>()
+                    .join(" ");
+                let id = create_entity(&mut self.scene, "Empty", at);
+                let e = self.scene.entity_mut(id).unwrap();
+                e.name = name;
+                e.transform_mut().position =
+                    Vec3 { x: (at.x * 4.0).round() / 4.0, y: 0.0, z: (at.z * 4.0).round() / 4.0 };
+                let mut mr = Component::new_default("MeshRenderer").unwrap();
+                let _ = mr.set_field("mesh", FieldValue::Text(path.clone()));
+                let _ = mr.set_field("base_color", FieldValue::Color(Color::WHITE));
+                e.add(mr);
+                self.selection = Some(id);
+                self.set_status(format!("Placed {}", path));
+            }
             Action::PlayClip(path) => {
                 if let Ok(full) = self.project.resolve(&path) {
                     run_audio(&mut self.audio, vec![AudioCmd::Play { path: full, volume: 1.0 }], &mut self.log);
@@ -1284,7 +1338,12 @@ fn asset_options(assets: &[String], comp: &str, field: &str) -> Vec<String> {
         match (comp, field) {
             ("MeshRenderer", "mesh") => {
                 opts.extend(PRIMITIVE_MESHES.iter().map(|s| s.to_string()));
-                opts.extend(assets.iter().filter(|a| a.to_lowercase().ends_with(".obj")).cloned());
+                opts.extend(
+                    assets
+                        .iter()
+                        .filter(|a| a.to_lowercase().ends_with(".obj") || grodot_core::gltf::is_model_path(a))
+                        .cloned(),
+                );
             }
             ("AudioSource", "clip") => {
                 opts.extend(assets.iter().filter(|a| a.to_lowercase().ends_with(".wav")).cloned())
@@ -1417,6 +1476,9 @@ impl Editor {
             let icon = asset_icon(a);
             let selected = self.asset_selected.as_deref() == Some(a.as_str());
             if self.ui.list_row(rr, a, selected, 0, Some(icon)) {
+                if grodot_core::gltf::is_model_path(a) || a.to_lowercase().ends_with(".obj") {
+                    self.drag_asset = Some((a.clone(), self.ui.input.mouse));
+                }
                 if self.ui.input.double_click && selected {
                     if a.ends_with(".gscene") {
                         actions.push(Action::OpenScene(a.clone()));
@@ -1489,6 +1551,30 @@ impl Editor {
                         e.add(Component::new_default("MeshRenderer").unwrap());
                     }
                     let _ = e.get_mut("MeshRenderer").unwrap().set_field("texture", FieldValue::Text(sel.clone()));
+                }
+            }
+        } else if grodot_core::gltf::is_model_path(&lower) {
+            if let Some(m) = self.renderer.model(&sel) {
+                let info = format!(
+                    "{} nodes, {} triangles, {} materials",
+                    m.gltf.nodes.len(),
+                    m.gltf.triangle_count(),
+                    m.gltf.materials.len()
+                );
+                self.ui.label_in(Rect::new(x, y, side.w - 20, 22), &info, TEXT_DIM);
+                y += 26;
+            }
+            self.ui.label_in(Rect::new(x, y, side.w - 20, 22), "Drag into the viewport to place it.", TEXT_DIM);
+            y += 28;
+            if let Some(id) = sel_entity {
+                if self.ui.button(Rect::new(x, y, bw, 26), "Use as mesh") {
+                    let e = self.scene.entity_mut(id).unwrap();
+                    if !e.has("MeshRenderer") {
+                        e.add(Component::new_default("MeshRenderer").unwrap());
+                    }
+                    let mr = e.get_mut("MeshRenderer").unwrap();
+                    let _ = mr.set_field("mesh", FieldValue::Text(sel.clone()));
+                    let _ = mr.set_field("base_color", FieldValue::Color(Color::WHITE));
                 }
             }
         } else if lower.ends_with(".obj") {
@@ -1727,7 +1813,7 @@ fn asset_icon(path: &str) -> (u32, &'static str) {
         (GREEN, "G")
     } else if l.ends_with(".wav") {
         (0xc07ae0, "A")
-    } else if l.ends_with(".obj") {
+    } else if l.ends_with(".obj") || grodot_core::gltf::is_model_path(&l) {
         (0x6ea0ff, "M")
     } else if l.ends_with(".gprefab") {
         (0x4fc3c3, "P")

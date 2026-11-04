@@ -29,6 +29,8 @@ jobs:
           ./target/release/grodot check examples/orb-garden
           ./target/release/grodot check examples/textured-demo
           ./target/release/grodot run examples/textured-demo --headless --frames 120
+          ./target/release/grodot check examples/gltf-demo
+          ./target/release/grodot run examples/gltf-demo --headless --frames 120
           ./target/release/grodot run examples/orb-garden --headless --frames 600 --screenshot game.png
       - name: Create, check and run a new project
         run: |

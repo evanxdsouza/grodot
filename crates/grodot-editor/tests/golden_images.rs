@@ -92,3 +92,9 @@ fn rendering_is_deterministic_across_runs() {
     let b = render_example("textured-demo", 10, 320, 180);
     assert_eq!(fnv64(&a), fnv64(&b));
 }
+
+#[test]
+fn gltf_village_matches_golden_image() {
+    let canvas = render_example("gltf-demo", 30, 640, 360);
+    check_golden("gltf-demo", &canvas);
+}

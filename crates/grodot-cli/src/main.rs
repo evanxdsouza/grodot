@@ -298,6 +298,15 @@ fn check_project(dir: &Path) -> Result<usize, String> {
             }
             if let Some(m) = e.mesh() {
                 need("mesh", &m.mesh);
+                if grodot_core::gltf::is_model_path(&m.mesh) {
+                    if let Ok(full) = project.resolve(&m.mesh) {
+                        if full.is_file() {
+                            if let Err(err) = grodot_core::gltf::load(&full) {
+                                report(format!("{}: entity '{}': model '{}': {}", rel, e.name, m.mesh, err));
+                            }
+                        }
+                    }
+                }
                 if let Some(t) = &m.material.texture {
                     need("texture", t);
                 }

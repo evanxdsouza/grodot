@@ -1,0 +1,1103 @@
+{
+ "scene_version": 1,
+ "name": "Village",
+ "environment": {
+  "background": "#86b2e2",
+  "ambient": 0.5
+ },
+ "entities": [
+  {
+   "id": 1,
+   "name": "Camera",
+   "parent": null,
+   "active": true,
+   "tag": "",
+   "components": [
+    {
+     "type": "Transform",
+     "position": [
+      1.5,
+      6.5,
+      13
+     ],
+     "rotation_degrees": [
+      -22,
+      8,
+      0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    {
+     "type": "Camera",
+     "fov": 55,
+     "near": 0.1,
+     "far": 200,
+     "active": true
+    }
+   ]
+  },
+  {
+   "id": 2,
+   "name": "Sun",
+   "parent": null,
+   "active": true,
+   "tag": "",
+   "components": [
+    {
+     "type": "Transform",
+     "position": [
+      0,
+      10,
+      0
+     ],
+     "rotation_degrees": [
+      -48,
+      40,
+      0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    {
+     "type": "Light",
+     "color": "#fff1d6",
+     "intensity": 1.05
+    }
+   ]
+  },
+  {
+   "id": 3,
+   "name": "Ground",
+   "parent": null,
+   "active": true,
+   "tag": "",
+   "components": [
+    {
+     "type": "Transform",
+     "position": [
+      0,
+      0,
+      0
+     ],
+     "rotation_degrees": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      40,
+      1,
+      40
+     ]
+    },
+    {
+     "type": "MeshRenderer",
+     "mesh": "plane",
+     "lit": true,
+     "visible": true,
+     "material": {
+      "base_color": "#ffffff",
+      "texture": "assets/textures/grass.png",
+      "uv_scale": [
+       14,
+       14
+      ]
+     }
+    },
+    {
+     "type": "Collider",
+     "shape": "box",
+     "size": [
+      1,
+      0.01,
+      1
+     ]
+    }
+   ]
+  },
+  {
+   "id": 4,
+   "name": "Path",
+   "parent": null,
+   "active": true,
+   "tag": "",
+   "components": [
+    {
+     "type": "Transform",
+     "position": [
+      0,
+      0.01,
+      3
+     ],
+     "rotation_degrees": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1.6,
+      1,
+      10
+     ]
+    },
+    {
+     "type": "MeshRenderer",
+     "mesh": "plane",
+     "lit": true,
+     "visible": true,
+     "material": {
+      "base_color": "#b49a72"
+     }
+    }
+   ]
+  },
+  {
+   "id": 5,
+   "name": "House",
+   "parent": null,
+   "active": true,
+   "tag": "",
+   "components": [
+    {
+     "type": "Transform",
+     "position": [
+      0,
+      0,
+      -2
+     ],
+     "rotation_degrees": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    {
+     "type": "MeshRenderer",
+     "mesh": "assets/models/house.glb",
+     "lit": true,
+     "visible": true,
+     "material": {
+      "base_color": "#ffffff"
+     }
+    }
+   ]
+  },
+  {
+   "id": 6,
+   "name": "House 2",
+   "parent": null,
+   "active": true,
+   "tag": "",
+   "components": [
+    {
+     "type": "Transform",
+     "position": [
+      -6,
+      0,
+      -4
+     ],
+     "rotation_degrees": [
+      0,
+      35,
+      0
+     ],
+     "scale": [
+      0.9,
+      0.9,
+      0.9
+     ]
+    },
+    {
+     "type": "MeshRenderer",
+     "mesh": "assets/models/house.glb",
+     "lit": true,
+     "visible": true,
+     "material": {
+      "base_color": "#e8e0ff"
+     }
+    }
+   ]
+  },
+  {
+   "id": 7,
+   "name": "Tree 1",
+   "parent": null,
+   "active": true,
+   "tag": "",
+   "components": [
+    {
+     "type": "Transform",
+     "position": [
+      -4,
+      0,
+      2
+     ],
+     "rotation_degrees": [
+      0,
+      37.139772323057684,
+      0
+     ],
+     "scale": [
+      1.0180240448687172,
+      1.0180240448687172,
+      1.0180240448687172
+     ]
+    },
+    {
+     "type": "MeshRenderer",
+     "mesh": "assets/models/pine_tree.glb",
+     "lit": true,
+     "visible": true,
+     "material": {
+      "base_color": "#ffffff"
+     }
+    }
+   ]
+  },
+  {
+   "id": 8,
+   "name": "Tree 2",
+   "parent": null,
+   "active": true,
+   "tag": "",
+   "components": [
+    {
+     "type": "Transform",
+     "position": [
+      5,
+      0,
+      -1
+     ],
+     "rotation_degrees": [
+      0,
+      55.7900174888677,
+      0
+     ],
+     "scale": [
+      1.0980291213053404,
+      1.0980291213053404,
+      1.0980291213053404
+     ]
+    },
+    {
+     "type": "MeshRenderer",
+     "mesh": "assets/models/round_tree.glb",
+     "lit": true,
+     "visible": true,
+     "material": {
+      "base_color": "#ffffff"
+     }
+    }
+   ]
+  },
+  {
+   "id": 9,
+   "name": "Tree 3",
+   "parent": null,
+   "active": true,
+   "tag": "",
+   "components": [
+    {
+     "type": "Transform",
+     "position": [
+      7,
+      0,
+      -6
+     ],
+     "rotation_degrees": [
+      0,
+      144.57276521462694,
+      0
+     ],
+     "scale": [
+      0.933257547839795,
+      0.933257547839795,
+      0.933257547839795
+     ]
+    },
+    {
+     "type": "MeshRenderer",
+     "mesh": "assets/models/pine_tree.glb",
+     "lit": true,
+     "visible": true,
+     "material": {
+      "base_color": "#ffffff"
+     }
+    }
+   ]
+  },
+  {
+   "id": 10,
+   "name": "Tree 4",
+   "parent": null,
+   "active": true,
+   "tag": "",
+   "components": [
+    {
+     "type": "Transform",
+     "position": [
+      -9,
+      0,
+      -9
+     ],
+     "rotation_degrees": [
+      0,
+      288.16284653849107,
+      0
+     ],
+     "scale": [
+      1.3589775215438593,
+      1.3589775215438593,
+      1.3589775215438593
+     ]
+    },
+    {
+     "type": "MeshRenderer",
+     "mesh": "assets/models/round_tree.glb",
+     "lit": true,
+     "visible": true,
+     "material": {
+      "base_color": "#ffffff"
+     }
+    }
+   ]
+  },
+  {
+   "id": 11,
+   "name": "Tree 5",
+   "parent": null,
+   "active": true,
+   "tag": "",
+   "components": [
+    {
+     "type": "Transform",
+     "position": [
+      -3,
+      0,
+      -8
+     ],
+     "rotation_degrees": [
+      0,
+      79.89414324851435,
+      0
+     ],
+     "scale": [
+      1.2825813012527192,
+      1.2825813012527192,
+      1.2825813012527192
+     ]
+    },
+    {
+     "type": "MeshRenderer",
+     "mesh": "assets/models/pine_tree.glb",
+     "lit": true,
+     "visible": true,
+     "material": {
+      "base_color": "#ffffff"
+     }
+    }
+   ]
+  },
+  {
+   "id": 12,
+   "name": "Tree 6",
+   "parent": null,
+   "active": true,
+   "tag": "",
+   "components": [
+    {
+     "type": "Transform",
+     "position": [
+      9,
+      0,
+      3
+     ],
+     "rotation_degrees": [
+      0,
+      99.60575163892207,
+      0
+     ],
+     "scale": [
+      1.1683400040874068,
+      1.1683400040874068,
+      1.1683400040874068
+     ]
+    },
+    {
+     "type": "MeshRenderer",
+     "mesh": "assets/models/round_tree.glb",
+     "lit": true,
+     "visible": true,
+     "material": {
+      "base_color": "#ffffff"
+     }
+    }
+   ]
+  },
+  {
+   "id": 13,
+   "name": "Tree 7",
+   "parent": null,
+   "active": true,
+   "tag": "",
+   "components": [
+    {
+     "type": "Transform",
+     "position": [
+      -10,
+      0,
+      1
+     ],
+     "rotation_degrees": [
+      0,
+      38.225985275350844,
+      0
+     ],
+     "scale": [
+      0.9863322646426844,
+      0.9863322646426844,
+      0.9863322646426844
+     ]
+    },
+    {
+     "type": "MeshRenderer",
+     "mesh": "assets/models/pine_tree.glb",
+     "lit": true,
+     "visible": true,
+     "material": {
+      "base_color": "#ffffff"
+     }
+    }
+   ]
+  },
+  {
+   "id": 14,
+   "name": "Rocks 1",
+   "parent": null,
+   "active": true,
+   "tag": "",
+   "components": [
+    {
+     "type": "Transform",
+     "position": [
+      3.5,
+      0,
+      3
+     ],
+     "rotation_degrees": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1.0,
+      1.0,
+      1.0
+     ]
+    },
+    {
+     "type": "MeshRenderer",
+     "mesh": "assets/models/rocks.glb",
+     "lit": true,
+     "visible": true,
+     "material": {
+      "base_color": "#ffffff"
+     }
+    }
+   ]
+  },
+  {
+   "id": 15,
+   "name": "Rocks 2",
+   "parent": null,
+   "active": true,
+   "tag": "",
+   "components": [
+    {
+     "type": "Transform",
+     "position": [
+      -2.5,
+      0,
+      5
+     ],
+     "rotation_degrees": [
+      0,
+      70,
+      0
+     ],
+     "scale": [
+      0.7,
+      0.7,
+      0.7
+     ]
+    },
+    {
+     "type": "MeshRenderer",
+     "mesh": "assets/models/rocks.glb",
+     "lit": true,
+     "visible": true,
+     "material": {
+      "base_color": "#ffffff"
+     }
+    }
+   ]
+  },
+  {
+   "id": 16,
+   "name": "Rocks 3",
+   "parent": null,
+   "active": true,
+   "tag": "",
+   "components": [
+    {
+     "type": "Transform",
+     "position": [
+      6,
+      0,
+      6
+     ],
+     "rotation_degrees": [
+      0,
+      140,
+      0
+     ],
+     "scale": [
+      1.3,
+      1.3,
+      1.3
+     ]
+    },
+    {
+     "type": "MeshRenderer",
+     "mesh": "assets/models/rocks.glb",
+     "lit": true,
+     "visible": true,
+     "material": {
+      "base_color": "#ffffff"
+     }
+    }
+   ]
+  },
+  {
+   "id": 17,
+   "name": "Rocks 4",
+   "parent": null,
+   "active": true,
+   "tag": "",
+   "components": [
+    {
+     "type": "Transform",
+     "position": [
+      -7,
+      0,
+      6
+     ],
+     "rotation_degrees": [
+      0,
+      210,
+      0
+     ],
+     "scale": [
+      0.9,
+      0.9,
+      0.9
+     ]
+    },
+    {
+     "type": "MeshRenderer",
+     "mesh": "assets/models/rocks.glb",
+     "lit": true,
+     "visible": true,
+     "material": {
+      "base_color": "#ffffff"
+     }
+    }
+   ]
+  },
+  {
+   "id": 18,
+   "name": "Fence 1",
+   "parent": null,
+   "active": true,
+   "tag": "",
+   "components": [
+    {
+     "type": "Transform",
+     "position": [
+      2.6,
+      0,
+      1.0
+     ],
+     "rotation_degrees": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    {
+     "type": "MeshRenderer",
+     "mesh": "assets/models/fence.glb",
+     "lit": true,
+     "visible": true,
+     "material": {
+      "base_color": "#ffffff"
+     }
+    }
+   ]
+  },
+  {
+   "id": 19,
+   "name": "Fence 2",
+   "parent": null,
+   "active": true,
+   "tag": "",
+   "components": [
+    {
+     "type": "Transform",
+     "position": [
+      4.6,
+      0,
+      1.0
+     ],
+     "rotation_degrees": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    {
+     "type": "MeshRenderer",
+     "mesh": "assets/models/fence.glb",
+     "lit": true,
+     "visible": true,
+     "material": {
+      "base_color": "#ffffff"
+     }
+    }
+   ]
+  },
+  {
+   "id": 20,
+   "name": "Fence 3",
+   "parent": null,
+   "active": true,
+   "tag": "",
+   "components": [
+    {
+     "type": "Transform",
+     "position": [
+      6.6,
+      0,
+      1.0
+     ],
+     "rotation_degrees": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    {
+     "type": "MeshRenderer",
+     "mesh": "assets/models/fence.glb",
+     "lit": true,
+     "visible": true,
+     "material": {
+      "base_color": "#ffffff"
+     }
+    }
+   ]
+  },
+  {
+   "id": 21,
+   "name": "Fence 4",
+   "parent": null,
+   "active": true,
+   "tag": "",
+   "components": [
+    {
+     "type": "Transform",
+     "position": [
+      8.6,
+      0,
+      1.0
+     ],
+     "rotation_degrees": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    {
+     "type": "MeshRenderer",
+     "mesh": "assets/models/fence.glb",
+     "lit": true,
+     "visible": true,
+     "material": {
+      "base_color": "#ffffff"
+     }
+    }
+   ]
+  },
+  {
+   "id": 22,
+   "name": "Fence 5",
+   "parent": null,
+   "active": true,
+   "tag": "",
+   "components": [
+    {
+     "type": "Transform",
+     "position": [
+      10.6,
+      0,
+      1.0
+     ],
+     "rotation_degrees": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    {
+     "type": "MeshRenderer",
+     "mesh": "assets/models/fence.glb",
+     "lit": true,
+     "visible": true,
+     "material": {
+      "base_color": "#ffffff"
+     }
+    }
+   ]
+  },
+  {
+   "id": 23,
+   "name": "Lamp 1",
+   "parent": null,
+   "active": true,
+   "tag": "",
+   "components": [
+    {
+     "type": "Transform",
+     "position": [
+      -1.6,
+      0,
+      5
+     ],
+     "rotation_degrees": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    {
+     "type": "MeshRenderer",
+     "mesh": "assets/models/lamp_post.gltf",
+     "lit": true,
+     "visible": true,
+     "material": {
+      "base_color": "#ffffff"
+     }
+    }
+   ]
+  },
+  {
+   "id": 24,
+   "name": "Lamp 2",
+   "parent": null,
+   "active": true,
+   "tag": "",
+   "components": [
+    {
+     "type": "Transform",
+     "position": [
+      1.6,
+      0,
+      1
+     ],
+     "rotation_degrees": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    {
+     "type": "MeshRenderer",
+     "mesh": "assets/models/lamp_post.gltf",
+     "lit": true,
+     "visible": true,
+     "material": {
+      "base_color": "#ffffff"
+     }
+    }
+   ]
+  },
+  {
+   "id": 25,
+   "name": "Bush 1",
+   "parent": null,
+   "active": true,
+   "tag": "",
+   "components": [
+    {
+     "type": "Transform",
+     "position": [
+      1.8,
+      0,
+      -0.6
+     ],
+     "rotation_degrees": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    {
+     "type": "MeshRenderer",
+     "mesh": "assets/models/bush.gltf",
+     "lit": true,
+     "visible": true,
+     "material": {
+      "base_color": "#ffffff"
+     }
+    }
+   ]
+  },
+  {
+   "id": 26,
+   "name": "Bush 2",
+   "parent": null,
+   "active": true,
+   "tag": "",
+   "components": [
+    {
+     "type": "Transform",
+     "position": [
+      -2.2,
+      0,
+      -0.4
+     ],
+     "rotation_degrees": [
+      0,
+      50,
+      0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    {
+     "type": "MeshRenderer",
+     "mesh": "assets/models/bush.gltf",
+     "lit": true,
+     "visible": true,
+     "material": {
+      "base_color": "#ffffff"
+     }
+    }
+   ]
+  },
+  {
+   "id": 27,
+   "name": "Bush 3",
+   "parent": null,
+   "active": true,
+   "tag": "",
+   "components": [
+    {
+     "type": "Transform",
+     "position": [
+      -4.5,
+      0,
+      -2.2
+     ],
+     "rotation_degrees": [
+      0,
+      100,
+      0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    {
+     "type": "MeshRenderer",
+     "mesh": "assets/models/bush.gltf",
+     "lit": true,
+     "visible": true,
+     "material": {
+      "base_color": "#ffffff"
+     }
+    }
+   ]
+  },
+  {
+   "id": 28,
+   "name": "Bush 4",
+   "parent": null,
+   "active": true,
+   "tag": "",
+   "components": [
+    {
+     "type": "Transform",
+     "position": [
+      4.2,
+      0,
+      4.8
+     ],
+     "rotation_degrees": [
+      0,
+      150,
+      0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    {
+     "type": "MeshRenderer",
+     "mesh": "assets/models/bush.gltf",
+     "lit": true,
+     "visible": true,
+     "material": {
+      "base_color": "#ffffff"
+     }
+    }
+   ]
+  },
+  {
+   "id": 29,
+   "name": "Crate",
+   "parent": null,
+   "active": true,
+   "tag": "",
+   "components": [
+    {
+     "type": "Transform",
+     "position": [
+      -1.7,
+      0.4,
+      1.2
+     ],
+     "rotation_degrees": [
+      0,
+      20,
+      0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    {
+     "type": "MeshRenderer",
+     "mesh": "assets/models/crate.glb",
+     "lit": true,
+     "visible": true,
+     "material": {
+      "base_color": "#ffffff"
+     }
+    },
+    {
+     "type": "Script",
+     "path": "scripts/bob.gro",
+     "enabled": true
+    }
+   ]
+  },
+  {
+   "id": 30,
+   "name": "Crate 2",
+   "parent": null,
+   "active": true,
+   "tag": "",
+   "components": [
+    {
+     "type": "Transform",
+     "position": [
+      -2.5,
+      0.4,
+      1.6
+     ],
+     "rotation_degrees": [
+      0,
+      -10,
+      0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    {
+     "type": "MeshRenderer",
+     "mesh": "assets/models/crate.glb",
+     "lit": true,
+     "visible": true,
+     "material": {
+      "base_color": "#ffffff"
+     }
+    }
+   ]
+  }
+ ]
+}

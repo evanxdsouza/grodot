@@ -28,7 +28,11 @@ impl Drop for Temp {
 }
 
 fn editor(name: &str) -> (Editor, Temp) {
-    let src = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../examples/orb-garden");
+    editor_for("orb-garden", name)
+}
+
+fn editor_for(example: &str, name: &str) -> (Editor, Temp) {
+    let src = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../examples").join(example);
     let dst = std::env::temp_dir().join(format!("grodot-ed-{}-{}", name, std::process::id()));
     let _ = std::fs::remove_dir_all(&dst);
     copy_dir(&src, &dst);
@@ -135,4 +139,30 @@ fn delete_and_duplicate_shortcuts() {
     assert_eq!(ed.scene.entities.len(), n + 2, "tree and its leaves are duplicated");
     ed.frame(InputFrame { keys: vec!["Delete".into()], ..Default::default() }, 1.0 / 60.0);
     assert_eq!(ed.scene.entities.len(), n);
+}
+
+#[test]
+fn dragging_a_model_into_the_viewport_places_it_on_the_ground() {
+    let (mut ed, _t) = editor_for("gltf-demo", "place");
+    let n = ed.scene.entities.len();
+    let vp = ed.layout().3;
+    let (cx, cy) = ((vp.x + vp.w / 2) as f32, (vp.y + vp.h / 2) as f32);
+    ed.apply(Action::PlaceModel("assets/models/house.glb".into(), (cx, cy)));
+    idle(&mut ed, 1);
+    assert_eq!(ed.scene.entities.len(), n + 1);
+    let e = ed.scene.entities.last().unwrap();
+    assert_eq!(e.name, "House");
+    assert_eq!(ed.selection, Some(e.id));
+    let mr = e.mesh().unwrap();
+    assert_eq!(mr.mesh, "assets/models/house.glb");
+    assert_eq!(mr.material.base_color, grodot_core::Color::WHITE);
+    assert_eq!(e.transform().position.y, 0.0);
+    // Selection and picking use the model's bounds.
+    let view = ed.camera.view(vp);
+    let id = e.id;
+    let top = ed.scene.world_matrix(id).transform_point(grodot_core::Vec3 { x: 0.0, y: 1.0, z: 0.0 });
+    let (px, py) = raster::project(&view, vp, top).unwrap();
+    ed.selection = None;
+    click(&mut ed, px, py);
+    assert_eq!(ed.selection, Some(id));
 }

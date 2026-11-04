@@ -1,0 +1,13 @@
+# Gently bobs and turns a crate (shows that scripts move imported models like any entity).
+class Bob < Entity
+  function ready()
+    @base = self.position
+    @t = 0
+  end
+
+  function update(delta)
+    @t += delta
+    self.position = @base.with_y(@base.y + 0.15 + 0.1 * Math.sin(@t * 2))
+    self.rotate(Vector3.new(0, 30 * delta, 0))
+  end
+end

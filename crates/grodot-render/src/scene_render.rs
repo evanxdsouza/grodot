@@ -29,8 +29,80 @@ pub struct RenderOptions {
     pub show_camera_icons: bool,
 }
 
+/// One drawable piece of a glTF model.
+pub struct ModelPart {
+    pub mesh: Rc<Mesh>,
+    /// Node index in the glTF (its transform comes from the node hierarchy).
+    pub node: usize,
+    pub material: RMaterial,
+    pub lines: bool,
+}
+
+/// A loaded glTF model ready to draw.
+pub struct RenderModel {
+    pub gltf: grodot_core::gltf::Gltf,
+    pub parts: Vec<ModelPart>,
+    pub bounds: (Vec3, Vec3),
+}
+
+impl RenderModel {
+    fn from_gltf(gltf: grodot_core::gltf::Gltf) -> RenderModel {
+        let textures: Vec<Option<Arc<Texture>>> =
+            gltf.images.iter().map(|img| img.as_ref().map(|i| Arc::new(Texture::from_image(i)))).collect();
+        let mut parts = Vec::new();
+        for (ni, node) in gltf.nodes.iter().enumerate() {
+            let Some(mi) = node.mesh else { continue };
+            for prim in &gltf.meshes[mi].primitives {
+                let gm = prim.material.and_then(|m| gltf.materials.get(m)).cloned().unwrap_or_default();
+                let mut mat = RMaterial::solid(gm.base_color, true);
+                if let Some(t) = &gm.base_color_texture {
+                    mat.texture = textures.get(t.image).cloned().flatten();
+                    mat.filter = t.filter;
+                    mat.wrap = t.wrap;
+                }
+                mat.alpha_mode = gm.alpha_mode;
+                mat.alpha_cutoff = gm.alpha_cutoff;
+                mat.double_sided = gm.double_sided;
+                parts.push(ModelPart {
+                    mesh: Rc::new(prim.mesh.clone()),
+                    node: ni,
+                    material: mat,
+                    lines: prim.kind == grodot_core::gltf::PrimitiveKind::Lines,
+                });
+            }
+        }
+        let bounds = gltf.bounds();
+        RenderModel { gltf, parts, bounds }
+    }
+}
+
+/// Combine a model's own material with the MeshRenderer's settings: the
+/// MeshRenderer colour tints, its texture (if set) replaces the model's, and
+/// its UV scale/offset, alpha mode and double-sidedness apply on top.
+pub fn combine_materials(model: &RMaterial, mr: &RMaterial, mr_has_texture: bool) -> RMaterial {
+    let mut m = model.clone();
+    for i in 0..4 {
+        m.base_color[i] *= mr.base_color[i];
+    }
+    if mr_has_texture {
+        m.texture = mr.texture.clone();
+        m.filter = mr.filter;
+        m.wrap = mr.wrap;
+    }
+    m.uv_scale = mr.uv_scale;
+    m.uv_offset = mr.uv_offset;
+    if mr.alpha_mode != grodot_core::scene::AlphaMode::Opaque {
+        m.alpha_mode = mr.alpha_mode;
+        m.alpha_cutoff = mr.alpha_cutoff;
+    }
+    m.double_sided |= mr.double_sided;
+    m.lit = mr.lit;
+    m
+}
+
 pub struct SceneRenderer {
     meshes: HashMap<String, Option<Rc<Mesh>>>,
+    models: HashMap<String, Option<Rc<RenderModel>>>,
     textures: HashMap<String, Option<Arc<Texture>>>,
     /// Project root used to resolve `.obj` mesh paths.
     pub root: Option<PathBuf>,
@@ -40,18 +112,61 @@ pub struct SceneRenderer {
 
 impl SceneRenderer {
     pub fn new(root: Option<PathBuf>) -> Self {
-        SceneRenderer { meshes: HashMap::new(), textures: HashMap::new(), root, warnings: Vec::new() }
+        SceneRenderer {
+            meshes: HashMap::new(),
+            models: HashMap::new(),
+            textures: HashMap::new(),
+            root,
+            warnings: Vec::new(),
+        }
     }
 
     /// Forget cached meshes and textures (e.g. after files changed on disk).
     pub fn clear_cache(&mut self) {
         self.meshes.clear();
+        self.models.clear();
         self.textures.clear();
+    }
+
+    /// Load (and cache) a glTF model (`.gltf` or `.glb`).
+    pub fn model(&mut self, path: &str) -> Option<Rc<RenderModel>> {
+        if let Some(m) = self.models.get(path) {
+            return m.clone();
+        }
+        let loaded = (|| -> Result<grodot_core::gltf::Gltf, String> {
+            let root = self.root.as_ref().ok_or("no project folder")?;
+            let full = grodot_core::config::resolve_in(root, path)?;
+            grodot_core::gltf::load(&full).map_err(|e| e.0)
+        })();
+        let model = match loaded {
+            Ok(g) => {
+                for w in &g.warnings {
+                    self.warnings.push(format!("model '{}': {}", path, w));
+                }
+                Some(Rc::new(RenderModel::from_gltf(g)))
+            }
+            Err(e) => {
+                self.warnings.push(format!("model '{}': {}", path, e));
+                None
+            }
+        };
+        self.models.insert(path.to_string(), model.clone());
+        model
+    }
+
+    /// Local-space bounds of whatever a MeshRenderer's `mesh` names.
+    pub fn mesh_bounds(&mut self, name: &str) -> Option<(Vec3, Vec3)> {
+        if grodot_core::gltf::is_model_path(name) {
+            self.model(name).map(|m| m.bounds)
+        } else {
+            self.mesh(name).map(|m| m.bounds())
+        }
     }
 
     /// Forget one cached asset so it is reloaded next frame (hot reload).
     pub fn invalidate(&mut self, path: &str) {
         self.meshes.remove(path);
+        self.models.remove(path);
         self.textures.remove(path);
     }
 
@@ -101,7 +216,7 @@ impl SceneRenderer {
         }
         let loaded = if let Some(p) = Mesh::primitive(name) {
             Some(Rc::new(p))
-        } else if name.is_empty() {
+        } else if name.is_empty() || grodot_core::gltf::is_model_path(name) {
             None
         } else {
             match &self.root {
@@ -189,14 +304,29 @@ impl SceneRenderer {
         Self::draw_background(canvas, viewport, scene.environment.background);
         let light = Self::lighting(scene, view);
         let mut meshes: Vec<(Rc<Mesh>, Mat4, RMaterial)> = Vec::new();
+        let mut line_parts: Vec<(Rc<Mesh>, Mat4, RMaterial)> = Vec::new();
         for e in &scene.entities {
             let Some(mr) = e.mesh() else { continue };
             if !mr.visible || !scene.is_active_in_hierarchy(e.id) {
                 continue;
             }
-            if let Some(mesh) = self.mesh(&mr.mesh) {
-                let mat = self.material(&mr.material, mr.lit);
-                meshes.push((mesh, scene.world_matrix(e.id), mat));
+            let world = scene.world_matrix(e.id);
+            let mat = self.material(&mr.material, mr.lit);
+            if grodot_core::gltf::is_model_path(&mr.mesh) {
+                if let Some(model) = self.model(&mr.mesh) {
+                    let nodes = model.gltf.node_world_matrices();
+                    for part in &model.parts {
+                        let m = combine_materials(&part.material, &mat, mr.material.texture.is_some());
+                        let w = world * nodes[part.node];
+                        if part.lines {
+                            line_parts.push((part.mesh.clone(), w, m));
+                        } else {
+                            meshes.push((part.mesh.clone(), w, m));
+                        }
+                    }
+                }
+            } else if let Some(mesh) = self.mesh(&mr.mesh) {
+                meshes.push((mesh, world, mat));
             }
         }
         // Blob shadows: soft dark discs under lit meshes, drawn as flat geometry.
@@ -233,6 +363,16 @@ impl SceneRenderer {
             meshes.iter().map(|(m, model, mat)| DrawItem { mesh: m, model: *model, material: mat.clone() }).collect();
         raster::draw_meshes(canvas, viewport, view, &light, &items);
         items.clear();
+        for (mesh, w, m) in &line_parts {
+            let c = raster::pack(m.base_color[0], m.base_color[1], m.base_color[2]);
+            for seg in mesh.indices.chunks_exact(2) {
+                let (Some(a), Some(b)) = (mesh.positions.get(seg[0] as usize), mesh.positions.get(seg[1] as usize))
+                else {
+                    continue;
+                };
+                raster::draw_line_3d(canvas, viewport, view, w.transform_point(*a), w.transform_point(*b), c, true);
+            }
+        }
         // Shadows are drawn as darkened unlit discs blended by depth test.
         for (model, strength) in &shadows {
             draw_shadow(canvas, viewport, view, &disc, *model, *strength);
@@ -267,11 +407,8 @@ impl SceneRenderer {
         if let Some(sel) = opts.selection {
             if let Some(e) = scene.entity(sel) {
                 let world = scene.world_matrix(sel);
-                let (lo, hi) = e
-                    .mesh()
-                    .and_then(|m| self.mesh(&m.mesh))
-                    .map(|m| m.bounds())
-                    .unwrap_or((Vec3::splat(-0.25), Vec3::splat(0.25)));
+                let (lo, hi) =
+                    e.mesh().and_then(|m| self.mesh_bounds(&m.mesh)).unwrap_or((Vec3::splat(-0.25), Vec3::splat(0.25)));
                 let pad = (hi - lo) * 0.02 + Vec3::splat(0.01);
                 draw_box(canvas, viewport, view, &world, lo - pad, hi + pad, 0xffa030, false);
             }
@@ -355,8 +492,8 @@ impl SceneRenderer {
             if !scene.is_active_in_hierarchy(e.id) {
                 continue;
             }
-            let (lo, hi) = match e.mesh().and_then(|m| self.mesh(&m.mesh)) {
-                Some(m) => m.bounds(),
+            let (lo, hi) = match e.mesh().and_then(|m| self.mesh_bounds(&m.mesh)) {
+                Some(b) => b,
                 None if e.has("Camera") || e.has("Camera2D") || e.has("Light") => {
                     (Vec3::splat(-0.25), Vec3::splat(0.25))
                 }
