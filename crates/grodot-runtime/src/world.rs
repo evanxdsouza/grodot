@@ -168,7 +168,7 @@ pub fn is_key_name(s: &str) -> bool {
         let c = s.chars().next().unwrap();
         return c.is_ascii_uppercase() || c.is_ascii_digit();
     }
-    KEY_NAMES.contains(&s)
+    KEY_NAMES.contains(&s) || crate::gamepad::is_pad_key(s)
 }
 
 #[derive(Debug, Clone)]
@@ -226,6 +226,8 @@ pub struct World {
     pub scene: Scene,
     pub project_root: Option<PathBuf>,
     pub input: InputState,
+    /// Gamepad state (polled each frame; pad buttons also feed `input`).
+    pub gamepad: crate::gamepad::Gamepad,
     pub time: TimeState,
     pub log: Log,
     pub hud: Hud,
@@ -263,6 +265,7 @@ impl World {
             scene,
             project_root,
             input: InputState::with_actions(actions),
+            gamepad: crate::gamepad::Gamepad::new(),
             time: TimeState::default(),
             log: Log::default(),
             hud: Hud::default(),
@@ -284,6 +287,11 @@ impl World {
             poses: HashMap::new(),
             scene_path: None,
         }
+    }
+
+    /// Read the gamepad (if any) into the input state. Called once per frame.
+    pub fn poll_gamepad(&mut self) {
+        self.gamepad.poll(&mut self.input);
     }
 
     pub fn resolve(&self, rel: &str) -> Result<PathBuf, String> {

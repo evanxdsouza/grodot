@@ -7,6 +7,7 @@
 
 pub mod animation;
 pub mod bindings;
+pub mod gamepad;
 pub mod physics;
 pub mod runtime;
 pub mod world;

@@ -218,6 +218,7 @@ impl Runtime {
             self.start();
         }
         let dt = dt.clamp(0.0, 0.1);
+        self.world.borrow_mut().poll_gamepad();
         let fixed = {
             let mut w = self.world.borrow_mut();
             w.time.delta = dt;

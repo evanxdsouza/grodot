@@ -1023,7 +1023,13 @@ pub fn install(interp: &mut Interpreter, world: &WorldRef, timers: &Rc<RefCell<T
                 .input
                 .action_down(&pos)
                 .ok_or_else(|| GroError::new(ErrorKind::Engine, format!("unknown input action '{}'", pos)))?;
-            Ok(Value::Number((p as i32 - n as i32) as f64))
+            let keys = (p as i32 - n as i32) as f32;
+            // The left stick drives the standard movement actions when a pad is connected.
+            let v = match w.gamepad.move_axis(&neg, &pos) {
+                Some(stick) if stick.abs() > keys.abs() => stick,
+                _ => keys,
+            };
+            Ok(Value::Number(v as f64))
         });
     }
     {
@@ -1063,6 +1069,59 @@ pub fn install(interp: &mut Interpreter, world: &WorldRef, timers: &Rc<RefCell<T
         });
     }
     interp.add_module(input);
+
+    // ---- Gamepad (Linux joystick API; no pad means every query is false or 0)
+    let pad = Module::new("Gamepad");
+    {
+        let w = world.clone();
+        pad.native("connected?", 0, Some(0), move |_, _| Ok(Value::Bool(w.borrow().gamepad.connected())));
+    }
+    {
+        let w = world.clone();
+        pad.native("device", 0, Some(0), move |_, _| {
+            Ok(match w.borrow().gamepad.device() {
+                Some(d) => Value::str(d),
+                None => Value::Nil,
+            })
+        });
+    }
+    for (fname, kind) in [("down?", 0), ("just_pressed?", 1), ("just_released?", 2)] {
+        let w = world.clone();
+        pad.native(fname, 1, Some(1), move |_, a| {
+            let button = str_arg(a, 0, fname)?;
+            let w = w.borrow();
+            let key = match crate::gamepad::button_key(&button) {
+                Some(k) => k,
+                None => {
+                    return engine_err(format!(
+                        "unknown pad button '{}' (use a, b, x, y, lb, rb, back, start, guide, ls, rs, dpad_up, dpad_down, dpad_left or dpad_right)",
+                        button
+                    ))
+                }
+            };
+            let set = match kind {
+                0 => &w.input.down,
+                1 => &w.input.pressed,
+                _ => &w.input.released,
+            };
+            Ok(Value::Bool(set.contains(key)))
+        });
+    }
+    {
+        let w = world.clone();
+        pad.native("axis", 1, Some(1), move |_, a| {
+            let name = str_arg(a, 0, "axis")?;
+            if !crate::gamepad::AXIS_NAMES.contains(&&*name) {
+                return engine_err(format!(
+                    "unknown pad axis '{}' (use {})",
+                    name,
+                    crate::gamepad::AXIS_NAMES.join(", ")
+                ));
+            }
+            Ok(Value::Number(w.borrow().gamepad.axis(&name) as f64))
+        });
+    }
+    interp.add_module(pad);
 
     // ---- Time
     let time = Module::new("Time");
