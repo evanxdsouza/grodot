@@ -12,6 +12,9 @@ use std::collections::{BTreeMap, HashMap};
 use std::path::PathBuf;
 use std::rc::Rc;
 
+mod hot_reload;
+pub use hot_reload::{Reloaded, CHECK_INTERVAL};
+
 /// Per-callback execution budget (statements), so a runaway loop cannot freeze the editor.
 pub const SCRIPT_BUDGET: u64 = 5_000_000;
 pub const MAX_FIXED_STEPS: u32 = 5;
@@ -32,6 +35,7 @@ pub struct Runtime {
     classes: HashMap<String, Result<Rc<Class>, String>>,
     accumulator: f32,
     started: bool,
+    watcher: hot_reload::Watcher,
 }
 
 impl Runtime {
@@ -51,6 +55,7 @@ impl Runtime {
             classes: HashMap::new(),
             accumulator: 0.0,
             started: false,
+            watcher: Default::default(),
         }
     }
 

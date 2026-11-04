@@ -12,5 +12,5 @@ pub mod physics;
 pub mod runtime;
 pub mod world;
 
-pub use runtime::{load_scene_file, Runtime};
+pub use runtime::{load_scene_file, Reloaded, Runtime};
 pub use world::{AudioCmd, InputState, Log, LogEntry, LogLevel, World};

@@ -318,7 +318,20 @@ impl Editor {
         }
 
         // Game input and simulation
+        let mut reload_note: Option<String> = None;
         if let Some(rt) = &mut self.play {
+            // Hot reload: changed scripts, textures and models apply without restarting play.
+            let reloaded = rt.hot_reload();
+            for asset in &reloaded.assets {
+                self.renderer.invalidate(asset);
+            }
+            if !reloaded.is_empty() {
+                reload_note = Some(if reloaded.failed.is_empty() {
+                    "Reloaded changed files".to_string()
+                } else {
+                    "Reloaded with errors (see console)".to_string()
+                });
+            }
             {
                 let mut w = rt.world.borrow_mut();
                 if !self.ui.has_text_focus() {
@@ -348,6 +361,9 @@ impl Editor {
             if rt.world.borrow().quit_requested {
                 actions.push(Action::TogglePlay);
             }
+        }
+        if let Some(note) = reload_note {
+            self.set_status(note);
         }
 
         let (w, h) = (self.ui.canvas.width as i32, self.ui.canvas.height as i32);
