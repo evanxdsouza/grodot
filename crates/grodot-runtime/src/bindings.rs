@@ -814,7 +814,7 @@ impl HostObject for ComponentRef {
         comp.fields().into_iter().find(|(n, _)| *n == name).map(|(_, v)| {
             Ok(match (name, v) {
                 // An unset texture reads as nil rather than "".
-                ("texture", FieldValue::Text(t)) if t.is_empty() => Value::Nil,
+                ("texture" | "emissive_texture", FieldValue::Text(t)) if t.is_empty() => Value::Nil,
                 (_, v) => field_to_value(v),
             })
         })
@@ -859,7 +859,7 @@ impl HostObject for ComponentRef {
                 _ => {}
             }
         }
-        if name == "texture" {
+        if name == "texture" || name == "emissive_texture" {
             if let Err(e) = self.check_texture(&value) {
                 return Some(Err(e));
             }

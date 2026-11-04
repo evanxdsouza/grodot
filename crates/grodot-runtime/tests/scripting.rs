@@ -354,7 +354,7 @@ end
     assert!(errs[0].contains("texture 'assets/textures/nope.png' not found"), "{}", errs[0]);
     assert!(errs[0].contains("File: scripts/bad.gro") && errs[0].contains("Line: 3"), "{}", errs[0]);
     assert!(matches!(field(&rt, "W", "tex"), Value::Str(s) if &*s == "assets/textures/t.png"));
-    assert!(matches!(field(&rt, "W", "fields"), Value::Number(n) if n == 9.0));
+    assert!(matches!(field(&rt, "W", "fields"), Value::Number(n) if n == 11.0));
     assert!(matches!(field(&rt, "W", "mode"), Value::Str(s) if &*s == "cutout"));
     let w = rt.world.borrow();
     let mr = w.scene.find_by_name("W").unwrap().mesh().unwrap().clone();

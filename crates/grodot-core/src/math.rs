@@ -373,6 +373,19 @@ impl Mat4 {
         }
     }
 
+    /// OpenGL-style orthographic projection (clip z in -1..1, w = 1).
+    pub fn orthographic(left: f32, right: f32, bottom: f32, top: f32, near: f32, far: f32) -> Mat4 {
+        let (rl, tb, fne) = (right - left, top - bottom, far - near);
+        Mat4 {
+            c: [
+                [2.0 / rl, 0.0, 0.0, 0.0],
+                [0.0, 2.0 / tb, 0.0, 0.0],
+                [0.0, 0.0, -2.0 / fne, 0.0],
+                [-(right + left) / rl, -(top + bottom) / tb, -(far + near) / fne, 1.0],
+            ],
+        }
+    }
+
     pub fn look_at(eye: Vec3, target: Vec3, up: Vec3) -> Mat4 {
         let f = (target - eye).normalized();
         let s = f.cross(up).normalized();

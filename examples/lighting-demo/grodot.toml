@@ -1,0 +1,16 @@
+[project]
+name = "Lighting Demo"
+version = "0.1.0"
+engine = "grodot"
+config_version = 1
+
+[game]
+main_scene = "scenes/main.gscene"
+
+[window]
+width = 1280
+height = 720
+title = "Lighting Demo - shadows, point lights and emissive"
+
+[input]
+toggle_shadows = "L"

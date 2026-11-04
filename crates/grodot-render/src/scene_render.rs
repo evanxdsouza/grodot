@@ -1,11 +1,11 @@
 //! Renders a [`Scene`] (shared by the editor viewport and the game runtime).
 
-use crate::canvas::{blend, Canvas, Rect};
-use crate::raster::{self, DrawItem, Lighting, RMaterial, View};
+use crate::canvas::{Canvas, Rect};
+use crate::raster::{self, DirLight, DrawItem, Lighting, LightingMode, LocalLight, RMaterial, Spot, View};
 use crate::texture::Texture;
 use grodot_core::math::{Color, Mat4, Quat, Vec3};
 use grodot_core::mesh::Mesh;
-use grodot_core::scene::{Component, EntityId, Material, Scene, Shape};
+use grodot_core::scene::{Component, EntityId, LightKind, Material, Scene, Shape};
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::rc::Rc;
@@ -67,6 +67,10 @@ impl RenderModel {
                     mat.filter = t.filter;
                     mat.wrap = t.wrap;
                 }
+                mat.emissive = [gm.emissive.r, gm.emissive.g, gm.emissive.b];
+                if let Some(t) = &gm.emissive_texture {
+                    mat.emissive_texture = textures.get(t.image).cloned().flatten();
+                }
                 mat.alpha_mode = gm.alpha_mode;
                 mat.alpha_cutoff = gm.alpha_cutoff;
                 mat.double_sided = gm.double_sided;
@@ -104,6 +108,13 @@ pub fn combine_materials(model: &RMaterial, mr: &RMaterial, mr_has_texture: bool
     }
     m.double_sided |= mr.double_sided;
     m.lit = mr.lit;
+    // The MeshRenderer's emissive adds to the model's own glow.
+    for i in 0..3 {
+        m.emissive[i] += mr.emissive[i];
+    }
+    if mr.emissive_texture.is_some() {
+        m.emissive_texture = mr.emissive_texture.clone();
+    }
     m
 }
 
@@ -115,7 +126,16 @@ pub struct SceneRenderer {
     pub root: Option<PathBuf>,
     /// Asset problems found while rendering (each reported once).
     pub warnings: Vec<String>,
+    /// Shadow map resolution (texels per side) for each shadowed directional light.
+    pub shadow_map_size: usize,
+    /// Shadows are rendered up to this distance (metres) from the camera.
+    pub shadow_distance: f32,
+    /// Per-pixel (default) or per-vertex lighting.
+    pub lighting_mode: LightingMode,
 }
+
+/// Default shadow map size. See docs/DECISIONS.md for the measured cost.
+pub const DEFAULT_SHADOW_MAP_SIZE: usize = 1024;
 
 impl SceneRenderer {
     pub fn new(root: Option<PathBuf>) -> Self {
@@ -125,6 +145,9 @@ impl SceneRenderer {
             textures: HashMap::new(),
             root,
             warnings: Vec::new(),
+            shadow_map_size: DEFAULT_SHADOW_MAP_SIZE,
+            shadow_distance: 40.0,
+            lighting_mode: LightingMode::PerPixel,
         }
     }
 
@@ -214,6 +237,8 @@ impl SceneRenderer {
             alpha_cutoff: m.alpha_cutoff,
             double_sided: m.double_sided,
             lit,
+            emissive: [m.emissive.r, m.emissive.g, m.emissive.b],
+            emissive_texture: m.emissive_texture.as_deref().and_then(|t| self.texture(t)),
         }
     }
 
@@ -280,15 +305,39 @@ impl SceneRenderer {
         Some(view_from_matrix(&world, 70.0, 0.1, 1000.0, viewport))
     }
 
+    /// Collect every active Light. Scenes with no Light get a default sun.
+    /// Shadow maps are not rendered here (see `render_ex`).
     pub fn lighting(scene: &Scene, view: &View) -> Lighting {
         let mut l = Lighting { ambient: scene.environment.ambient, ..Default::default() };
-        if let Some(e) = scene.entities.iter().find(|e| e.has("Light") && scene.is_active_in_hierarchy(e.id)) {
-            if let Some(Component::Light(light)) = e.get("Light") {
-                let world = scene.world_matrix(e.id);
-                l.direction = world.transform_vector(Vec3::FORWARD).normalized();
-                l.color = light.color;
-                l.intensity = light.intensity;
+        let mut any = false;
+        let mut suns = Vec::new();
+        for e in &scene.entities {
+            let Some(Component::Light(light)) = e.get("Light") else { continue };
+            if !scene.is_active_in_hierarchy(e.id) {
+                continue;
             }
+            any = true;
+            let world = scene.world_matrix(e.id);
+            let forward = world.transform_vector(Vec3::FORWARD).normalized();
+            match light.kind {
+                LightKind::Directional => suns.push(DirLight {
+                    direction: forward,
+                    color: light.color,
+                    intensity: light.intensity,
+                    casts_shadows: light.shadows,
+                    shadow: None,
+                }),
+                LightKind::Point | LightKind::Spot => l.locals.push(LocalLight {
+                    position: world.get_translation(),
+                    color: light.color,
+                    intensity: light.intensity,
+                    range: light.range.max(0.01),
+                    spot: (light.kind == LightKind::Spot).then(|| Spot::new(forward, light.spot_angle)),
+                }),
+            }
+        }
+        if any {
+            l.suns = suns;
         }
         let bg = scene.environment.background;
         l.fog_color = horizon(bg);
@@ -305,6 +354,23 @@ impl SceneRenderer {
         canvas.vgradient(viewport, top, bottom);
         canvas.clip = old;
         canvas.clear_depth_rect(viewport);
+    }
+
+    /// Render a shadow map for each directional light that casts shadows
+    /// (at most `raster::MAX_SHADOWED_SUNS`).
+    pub fn render_shadow_maps(&self, light: &mut Lighting, view: &View, items: &[DrawItem]) {
+        if self.shadow_map_size == 0 || !items.iter().any(|i| i.cast_shadows) {
+            return;
+        }
+        let mut done = 0;
+        for sun in light.suns.iter_mut() {
+            if !sun.casts_shadows || done >= raster::MAX_SHADOWED_SUNS {
+                continue;
+            }
+            done += 1;
+            let (vp, texel, dpm) = shadow_camera(view, sun.direction, self.shadow_map_size, self.shadow_distance);
+            sun.shadow = Some(Arc::new(raster::render_shadow_map(self.shadow_map_size, vp, texel, dpm, items)));
+        }
     }
 
     pub fn render(&mut self, canvas: &mut Canvas, viewport: Rect, scene: &Scene, view: &View, opts: &RenderOptions) {
@@ -328,8 +394,9 @@ impl SceneRenderer {
     ) {
         Self::draw_background(canvas, viewport, scene.environment.background);
         let mut bones: Vec<(Vec3, Vec3)> = Vec::new();
-        let light = Self::lighting(scene, view);
-        let mut meshes: Vec<(Rc<Mesh>, Mat4, RMaterial)> = Vec::new();
+        let mut light = Self::lighting(scene, view);
+        light.mode = self.lighting_mode;
+        let mut meshes: Vec<(Rc<Mesh>, Mat4, RMaterial, bool)> = Vec::new();
         let mut line_parts: Vec<(Rc<Mesh>, Mat4, RMaterial)> = Vec::new();
         for e in &scene.entities {
             let Some(mr) = e.mesh() else { continue };
@@ -362,13 +429,16 @@ impl SceneRenderer {
                         } else if skinned {
                             // Skinned vertices live in model space; the mesh node's own transform is ignored (glTF rule).
                             match &skin_joints {
-                                Some(j) => {
-                                    meshes.push((Rc::new(grodot_core::animation::skin_mesh(&part.mesh, j)), world, m))
-                                }
-                                None => meshes.push((part.mesh.clone(), world, m)),
+                                Some(j) => meshes.push((
+                                    Rc::new(grodot_core::animation::skin_mesh(&part.mesh, j)),
+                                    world,
+                                    m,
+                                    mr.cast_shadows,
+                                )),
+                                None => meshes.push((part.mesh.clone(), world, m, mr.cast_shadows)),
                             }
                         } else {
-                            meshes.push((part.mesh.clone(), world * nodes[part.node], m));
+                            meshes.push((part.mesh.clone(), world * nodes[part.node], m, mr.cast_shadows));
                         }
                     }
                     if let (Some(k), true) = (&skeleton, skeleton.as_ref().map(|k| k.show_bones).unwrap_or(false)) {
@@ -386,41 +456,19 @@ impl SceneRenderer {
                     }
                 }
             } else if let Some(mesh) = self.mesh(&mr.mesh) {
-                meshes.push((mesh, world, mat));
+                meshes.push((mesh, world, mat, mr.cast_shadows));
             }
         }
-        // Blob shadows: soft dark discs under lit meshes, drawn as flat geometry.
-        let disc = shadow_disc();
-        let mut shadows = Vec::new();
-        for (mesh, model, mat) in &meshes {
-            if !mat.lit || mat.alpha_mode != grodot_core::scene::AlphaMode::Opaque {
-                continue;
-            }
-            let (lo, hi) = mesh.bounds();
-            let size = model.transform_vector(hi - lo).abs();
-            let centre = model.transform_point((lo + hi) * 0.5);
-            let bottom = centre.y - size.y * 0.5;
-            if size.y < 0.05 || size.x > 6.0 || size.z > 6.0 {
-                continue; // floors and walls do not cast blobs
-            }
-            if let Some(ground) = ground_height(scene, &meshes, centre, bottom) {
-                let h = bottom - ground;
-                if (0.0..8.0).contains(&h) {
-                    let r = (size.x.max(size.z) * 0.6) * (1.0 - h / 10.0);
-                    let strength = (1.0 - h / 8.0) * 0.5;
-                    shadows.push((
-                        Mat4::from_trs(
-                            Vec3 { x: centre.x, y: ground + 0.012, z: centre.z },
-                            grodot_core::math::Quat::IDENTITY,
-                            Vec3 { x: r, y: 1.0, z: r },
-                        ),
-                        strength,
-                    ));
-                }
-            }
-        }
-        let mut items: Vec<DrawItem> =
-            meshes.iter().map(|(m, model, mat)| DrawItem { mesh: m, model: *model, material: mat.clone() }).collect();
+        let mut items: Vec<DrawItem> = meshes
+            .iter()
+            .map(|(m, model, mat, cast)| DrawItem {
+                mesh: m,
+                model: *model,
+                material: mat.clone(),
+                cast_shadows: *cast,
+            })
+            .collect();
+        self.render_shadow_maps(&mut light, view, &items);
         raster::draw_meshes(canvas, viewport, view, &light, &items);
         items.clear();
         for (mesh, w, m) in &line_parts {
@@ -432,10 +480,6 @@ impl SceneRenderer {
                 };
                 raster::draw_line_3d(canvas, viewport, view, w.transform_point(*a), w.transform_point(*b), c, true);
             }
-        }
-        // Shadows are drawn as darkened unlit discs blended by depth test.
-        for (model, strength) in &shadows {
-            draw_shadow(canvas, viewport, view, &disc, *model, *strength);
         }
         for (a, b) in &bones {
             raster::draw_line_3d(canvas, viewport, view, *a, *b, 0xffe040, false);
@@ -458,9 +502,11 @@ impl SceneRenderer {
         }
         if opts.show_camera_icons {
             for e in &scene.entities {
-                if e.has("Camera") || e.has("Camera2D") || e.has("Light") {
+                if let Some(Component::Light(l)) = e.get("Light") {
+                    draw_light_gizmo(canvas, viewport, view, &scene.world_matrix(e.id), l);
+                } else if e.has("Camera") || e.has("Camera2D") {
                     let world = scene.world_matrix(e.id);
-                    let col = if e.has("Camera") || e.has("Camera2D") { 0xffffff } else { 0xffe060 };
+                    let col = 0xffffff;
                     draw_box(canvas, viewport, view, &world, Vec3::splat(-0.2), Vec3::splat(0.2), col, false);
                     let tip = world.transform_point(Vec3::FORWARD * 0.8);
                     raster::draw_line_3d(canvas, viewport, view, world.transform_point(Vec3::ZERO), tip, col, false);
@@ -652,6 +698,107 @@ fn horizon(bg: Color) -> Color {
     Color { r: bg.r + (1.0 - bg.r) * 0.35, g: bg.g + (1.0 - bg.g) * 0.35, b: bg.b + (1.0 - bg.b) * 0.35, a: 1.0 }
 }
 
+/// Editor gizmo for a light: a sun with parallel rays (directional), three
+/// range rings (point) or a cone out to its range (spot). Drawn in the
+/// light's colour, without depth testing.
+pub fn draw_light_gizmo(
+    canvas: &mut Canvas,
+    viewport: Rect,
+    view: &View,
+    world: &Mat4,
+    light: &grodot_core::scene::Light,
+) {
+    let c = light.color;
+    let col = raster::pack(0.35 + 0.65 * c.r, 0.35 + 0.65 * c.g, 0.35 + 0.65 * c.b);
+    let o = world.get_translation();
+    // Directions only: gizmo sizes ignore the entity's scale.
+    let dir = |v: Vec3| world.transform_vector(v).normalized();
+    let (fwd, right, up) = (dir(Vec3::FORWARD), dir(Vec3::X), dir(Vec3::Y));
+    let line = |canvas: &mut Canvas, a: Vec3, b: Vec3| raster::draw_line_3d(canvas, viewport, view, a, b, col, false);
+    let ring = |canvas: &mut Canvas, centre: Vec3, u: Vec3, v: Vec3, r: f32| {
+        let n = 32;
+        for i in 0..n {
+            let a0 = i as f32 / n as f32 * std::f32::consts::TAU;
+            let a1 = (i + 1) as f32 / n as f32 * std::f32::consts::TAU;
+            line(canvas, centre + (u * a0.cos() + v * a0.sin()) * r, centre + (u * a1.cos() + v * a1.sin()) * r);
+        }
+    };
+    match light.kind {
+        LightKind::Directional => {
+            ring(canvas, o, right, up, 0.3);
+            for (dx, dy) in [(0.0, 0.0), (0.3, 0.0), (-0.3, 0.0), (0.0, 0.3), (0.0, -0.3)] {
+                let s = o + right * dx + up * dy;
+                line(canvas, s, s + fwd * 1.5);
+            }
+            // Arrow head on the centre ray.
+            let tip = o + fwd * 1.5;
+            line(canvas, tip, tip - fwd * 0.25 + right * 0.12);
+            line(canvas, tip, tip - fwd * 0.25 - right * 0.12);
+        }
+        LightKind::Point => {
+            let r = light.range;
+            ring(canvas, o, Vec3::X, Vec3::Y, r);
+            ring(canvas, o, Vec3::X, Vec3::Z, r);
+            ring(canvas, o, Vec3::Y, Vec3::Z, r);
+            ring(canvas, o, Vec3::X, Vec3::Z, 0.15);
+        }
+        LightKind::Spot => {
+            let half = (light.spot_angle * 0.5).to_radians();
+            let len = light.range;
+            let rad = len * half.tan().min(50.0);
+            let end = o + fwd * len;
+            ring(canvas, end, right, up, rad);
+            for k in 0..4 {
+                let a = k as f32 * std::f32::consts::FRAC_PI_2;
+                line(canvas, o, end + (right * a.cos() + up * a.sin()) * rad);
+            }
+            line(canvas, o, end);
+        }
+    }
+}
+
+/// Fit an orthographic light camera around the part of the view frustum
+/// within `distance` of the camera. Returns (world -> light clip, world size
+/// of one texel, NDC depth per metre).
+///
+/// The fit uses the bounding sphere of the frustum slice, so its size does not
+/// change as the camera turns, and the centre is snapped to whole texels so
+/// shadow edges do not shimmer as the camera moves.
+pub fn shadow_camera(view: &View, direction: Vec3, size: usize, distance: f32) -> (Mat4, f32, f32) {
+    let dir = direction.normalized();
+    let inv = view.view_proj().inverse();
+    let (n, f) = (view.near.max(0.01), view.far.max(view.near + 0.1));
+    let t = ((distance.min(f) - n) / (f - n)).clamp(0.0, 1.0);
+    let unproject = |x: f32, y: f32, z: f32| {
+        let c = inv.transform4(Vec3 { x, y, z });
+        Vec3 { x: c.x / c.w, y: c.y / c.w, z: c.z / c.w }
+    };
+    let mut pts = Vec::with_capacity(8);
+    for (x, y) in [(-1.0, -1.0), (1.0, -1.0), (-1.0, 1.0), (1.0, 1.0)] {
+        let a = unproject(x, y, -1.0);
+        let b = unproject(x, y, 1.0);
+        // Linear in view depth along the ray from the near to the far plane.
+        pts.push(a);
+        pts.push(a + (b - a) * t);
+    }
+    let centre = pts.iter().fold(Vec3::ZERO, |acc, p| acc + *p) * (1.0 / pts.len() as f32);
+    let radius = pts.iter().map(|p| (*p - centre).length()).fold(0.0f32, f32::max).max(1.0);
+    let up = if dir.y.abs() > 0.99 { Vec3::Z } else { Vec3::Y };
+    let rot = Mat4::look_at(Vec3::ZERO, dir, up);
+    let texel = 2.0 * radius / size as f32;
+    let mut lc = rot.transform_point(centre);
+    lc.x = (lc.x / texel).round() * texel;
+    lc.y = (lc.y / texel).round() * texel;
+    let centre = rot.inverse().transform_point(lc);
+    // Casters up to 60 m behind the slice (towards the light) still block it.
+    let back = 60.0;
+    let eye = centre - dir * (radius + back);
+    let far = 2.0 * radius + back;
+    let lv = Mat4::look_at(eye, centre, up);
+    let proj = Mat4::orthographic(-radius, radius, -radius, radius, 0.0, far);
+    (proj * lv, texel, 2.0 / far)
+}
+
 pub fn view_from_matrix(world: &Mat4, fov: f32, near: f32, far: f32, viewport: Rect) -> View {
     let eye = world.transform_point(Vec3::ZERO);
     let fwd = world.transform_vector(Vec3::FORWARD).normalized();
@@ -687,81 +834,6 @@ pub fn ray_aabb(o: Vec3, d: Vec3, lo: Vec3, hi: Vec3) -> Option<f32> {
         Some(tmin.max(0.0))
     } else {
         None
-    }
-}
-
-fn ground_height(_scene: &Scene, meshes: &[(Rc<Mesh>, Mat4, RMaterial)], p: Vec3, below: f32) -> Option<f32> {
-    let mut best: Option<f32> = None;
-    for (m, model, _) in meshes {
-        let (lo, hi) = m.bounds();
-        let wlo = model.transform_point(lo);
-        let whi = model.transform_point(hi);
-        let (mn, mx) = (wlo.min(whi), wlo.max(whi));
-        if p.x >= mn.x
-            && p.x <= mx.x
-            && p.z >= mn.z
-            && p.z <= mx.z
-            && mx.y <= below + 0.01
-            && (mx.x - mn.x) > 1.5
-            && best.map(|b| mx.y > b).unwrap_or(true)
-        {
-            best = Some(mx.y);
-        }
-    }
-    best
-}
-
-fn shadow_disc() -> Vec<Vec3> {
-    (0..20)
-        .map(|i| {
-            let a = i as f32 / 20.0 * std::f32::consts::TAU;
-            Vec3 { x: a.cos() * 0.5, y: 0.0, z: a.sin() * 0.5 }
-        })
-        .collect()
-}
-
-fn draw_shadow(canvas: &mut Canvas, viewport: Rect, view: &View, disc: &[Vec3], model: Mat4, strength: f32) {
-    // Project the disc outline and fill it with a darkening blend (scanline polygon).
-    let pd: Vec<(f32, f32, f32)> =
-        disc.iter().filter_map(|p| raster::project_depth(view, viewport, model.transform_point(*p))).collect();
-    if pd.len() < disc.len() {
-        return;
-    }
-    let pts: Vec<(f32, f32)> = pd.iter().map(|p| (p.0, p.1)).collect();
-    // Only darken pixels that are not in front of the shadow plane (occluders keep their colour).
-    let min_lin = pd.iter().map(|p| raster::linear_depth(view, p.2)).fold(f32::INFINITY, f32::min) - 0.15;
-    let min_y = pts.iter().map(|p| p.1).fold(f32::INFINITY, f32::min).max(viewport.y as f32) as i32;
-    let max_y = pts.iter().map(|p| p.1).fold(f32::NEG_INFINITY, f32::max).min(viewport.bottom() as f32 - 1.0) as i32;
-    let alpha = (strength.clamp(0.0, 1.0) * 255.0) as u32;
-    let cx = pts.iter().map(|p| p.0).sum::<f32>() / pts.len() as f32;
-    let cy = pts.iter().map(|p| p.1).sum::<f32>() / pts.len() as f32;
-    let rx = pts.iter().map(|p| (p.0 - cx).abs()).fold(0.0, f32::max).max(1.0);
-    let ry = pts.iter().map(|p| (p.1 - cy).abs()).fold(0.0, f32::max).max(1.0);
-    for y in min_y..=max_y {
-        let mut xs = Vec::new();
-        for i in 0..pts.len() {
-            let (a, b) = (pts[i], pts[(i + 1) % pts.len()]);
-            let yf = y as f32 + 0.5;
-            if (a.1 <= yf && b.1 > yf) || (b.1 <= yf && a.1 > yf) {
-                xs.push(a.0 + (yf - a.1) / (b.1 - a.1) * (b.0 - a.0));
-            }
-        }
-        if xs.len() < 2 {
-            continue;
-        }
-        xs.sort_by(|a, b| a.partial_cmp(b).unwrap());
-        let x0 = (xs[0].max(viewport.x as f32)) as i32;
-        let x1 = (xs[xs.len() - 1].min(viewport.right() as f32 - 1.0)) as i32;
-        for x in x0..=x1 {
-            let dx = (x as f32 + 0.5 - cx) / rx;
-            let dy = (y as f32 + 0.5 - cy) / ry;
-            let fall = (1.0 - (dx * dx + dy * dy)).clamp(0.0, 1.0);
-            let i = y as usize * canvas.width + x as usize;
-            if raster::linear_depth(view, canvas.depth[i]) < min_lin {
-                continue;
-            }
-            canvas.color[i] = blend(canvas.color[i], 0x000000, (alpha as f32 * fall) as u32);
-        }
     }
 }
 

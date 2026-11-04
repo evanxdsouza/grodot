@@ -112,3 +112,55 @@ Performance notes:
 Animation sampling supports LINEAR (with slerp for rotations), STEP and
 CUBICSPLINE. Crossfades blend the outgoing pose into the new clip; the default
 is 0.2 s.
+
+**D12. Lights: directional, point and spot, with shadows for suns.** A `Light`
+component has a `light_type` (directional, point or spot), `color`,
+`intensity`, `range` (point and spot), `spot_angle` (spot) and `shadows`.
+Only directional lights cast shadows. Point and spot shadows are not done yet.
+At most two shadowed suns are rendered per frame; any extra sun is lit without
+shadows.
+
+**D13. Shadow maps are orthographic depth passes.** Each frame, every shadowed
+sun gets a shadow map sized to the part of the view frustum within 40 m of the
+camera (`shadow_distance`). The map is fitted to the frustum slice's bounding
+sphere, and its centre is snapped to whole texels so edges do not shimmer when
+the camera moves. The depth pass reuses the main rasterizer's setup and
+depth-test code, without culling, so open or thin meshes cast shadows too.
+Lookups use a 3x3 bilinear-weighted PCF (16 depth taps), with a normal-offset
+and a depth bias that grows at grazing angles to avoid acne.
+
+The blob shadows are gone. Shadows now come from real geometry, so they land
+on the right surfaces (roofs, platforms) instead of on the ground below.
+
+**D14. Per-pixel versus per-vertex lighting: per-pixel is the default.**
+Benchmark: `cargo test --release -p grodot-editor --test bench_lighting --
+--ignored --nocapture`, examples/orb-garden at 1280x720, 60 frames after a
+warm-up. Machine: 4 vCPUs (Intel Xeon 2.10 GHz), software renderer, no GPU.
+
+| Configuration                | ms/frame | fps  |
+|------------------------------|---------:|-----:|
+| per-vertex, no shadows       |    25.91 | 38.6 |
+| per-vertex, shadows 1024     |    52.95 | 18.9 |
+| per-pixel, no shadows        |    24.43 | 40.9 |
+| per-pixel, shadows 512       |    47.03 | 21.3 |
+| per-pixel, shadows 1024      |    49.29 | 20.3 |
+| per-pixel, shadows 2048      |    64.95 | 15.4 |
+
+Per-vertex lighting did not pay off. The gather is cheap per vertex, but
+shading still runs per pixel, and with many small triangles the vertex
+interpolation saves little. The cost of per-pixel lighting is about 1 ms, and
+it removes the Gouraud look on point lights and spot cones. The `PerVertex`
+mode stays available for slow machines, but it is not the default.
+
+Shadow cost is the real cost: roughly +25 ms at 1024. Most of it is the PCF
+lookup, which runs once for every lit pixel (16 taps), and the depth pass for
+all casters. The map size matters less than the number of lit pixels. Ways
+to cut it, if needed: a 2x2 PCF (4 taps), a smaller `shadow_distance`, or
+shadows only on the nearest sun. 1024 is kept as the default, following the
+starting point. Setting `shadows` to false on the sun turns the cost off
+completely.
+
+**D15. Emissive surfaces.** A Material has `emissive` (a colour) and
+`emissive_texture`. The glow is added after lighting, so emissive surfaces
+stay bright in shadow. glTF `emissiveFactor` and `emissiveTexture` are read
+too.

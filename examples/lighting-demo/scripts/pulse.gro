@@ -1,0 +1,12 @@
+# Makes the crystal's glow breathe by animating its emissive colour.
+class Pulse < Entity
+  function ready()
+    @t = 0
+  end
+
+  function update(delta)
+    @t += delta
+    k = 0.55 + 0.45 * Math.sin(@t * 2)
+    self.material.emissive = Color.new(0.25 * k, 1.0 * k, 0.8 * k)
+  end
+end

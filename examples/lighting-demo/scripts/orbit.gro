@@ -1,0 +1,14 @@
+# Carries a green point light in a circle around the middle of the scene.
+class Orbit < Entity
+  RADIUS = 2.6
+  SPEED = 0.9
+
+  function ready()
+    @t = 0
+  end
+
+  function update(delta)
+    @t += delta * SPEED
+    self.position = Vector3.new(Math.cos(@t) * RADIUS, 1.2, Math.sin(@t) * RADIUS + 0.5)
+  end
+end

@@ -105,3 +105,10 @@ fn skinned_character_matches_golden_image() {
     let canvas = render_example("character-demo", 40, 640, 360);
     check_golden("character-demo", &canvas);
 }
+
+#[test]
+fn lighting_demo_matches_golden_image() {
+    // 30 frames: the orbiting point light has moved, the candle has flickered.
+    let canvas = render_example("lighting-demo", 30, 640, 360);
+    check_golden("lighting-demo", &canvas);
+}

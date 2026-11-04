@@ -1,0 +1,17 @@
+# The sun: press L to switch its shadows on and off.
+class Demo < Entity
+  function ready()
+    @sun = self.get_component("Light")
+  end
+
+  function update(delta)
+    if Input.just_pressed("toggle_shadows")
+      @sun.shadows = not @sun.shadows
+    end
+    state = "off"
+    if @sun.shadows
+      state = "on"
+    end
+    UI.text("Sun shadows: #{state}  (L to toggle)")
+  end
+end

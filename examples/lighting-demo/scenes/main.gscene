@@ -1,0 +1,656 @@
+{
+ "scene_version": 1,
+ "name": "Lighting",
+ "environment": {
+  "background": "#1c2340",
+  "ambient": 0.22
+ },
+ "entities": [
+  {
+   "id": 1,
+   "name": "Camera",
+   "parent": null,
+   "active": true,
+   "tag": "",
+   "components": [
+    {
+     "type": "Transform",
+     "position": [
+      0,
+      6.5,
+      11
+     ],
+     "rotation_degrees": [
+      -27,
+      0,
+      0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    {
+     "type": "Camera",
+     "fov": 55,
+     "near": 0.1,
+     "far": 120,
+     "active": true
+    }
+   ]
+  },
+  {
+   "id": 2,
+   "name": "Sun",
+   "parent": null,
+   "active": true,
+   "tag": "",
+   "components": [
+    {
+     "type": "Transform",
+     "position": [
+      0,
+      10,
+      0
+     ],
+     "rotation_degrees": [
+      -42,
+      35,
+      0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    {
+     "type": "Light",
+     "light_type": "directional",
+     "color": "#ffd9b0",
+     "intensity": 0.7,
+     "range": 10,
+     "spot_angle": 45,
+     "shadows": true
+    },
+    {
+     "type": "Script",
+     "path": "scripts/demo.gro",
+     "enabled": true
+    }
+   ]
+  },
+  {
+   "id": 3,
+   "name": "Floor",
+   "parent": null,
+   "active": true,
+   "tag": "",
+   "components": [
+    {
+     "type": "Transform",
+     "position": [
+      0,
+      0,
+      0
+     ],
+     "rotation_degrees": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      22,
+      1,
+      22
+     ]
+    },
+    {
+     "type": "MeshRenderer",
+     "mesh": "plane",
+     "lit": true,
+     "visible": true,
+     "cast_shadows": true,
+     "material": {
+      "base_color": "#ffffff",
+      "texture": "assets/textures/tiles.png",
+      "uv_scale": [
+       11,
+       11
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "id": 4,
+   "name": "Pillar 1",
+   "parent": null,
+   "active": true,
+   "tag": "",
+   "components": [
+    {
+     "type": "Transform",
+     "position": [
+      -5,
+      1.5,
+      -4
+     ],
+     "rotation_degrees": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      0.8,
+      3.0,
+      0.8
+     ]
+    },
+    {
+     "type": "MeshRenderer",
+     "mesh": "cube",
+     "lit": true,
+     "visible": true,
+     "cast_shadows": true,
+     "material": {
+      "base_color": "#b9b2a6"
+     }
+    }
+   ]
+  },
+  {
+   "id": 5,
+   "name": "Pillar 2",
+   "parent": null,
+   "active": true,
+   "tag": "",
+   "components": [
+    {
+     "type": "Transform",
+     "position": [
+      -1.5,
+      2.0,
+      -5
+     ],
+     "rotation_degrees": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      0.8,
+      4.0,
+      0.8
+     ]
+    },
+    {
+     "type": "MeshRenderer",
+     "mesh": "cube",
+     "lit": true,
+     "visible": true,
+     "cast_shadows": true,
+     "material": {
+      "base_color": "#b9b2a6"
+     }
+    }
+   ]
+  },
+  {
+   "id": 6,
+   "name": "Pillar 3",
+   "parent": null,
+   "active": true,
+   "tag": "",
+   "components": [
+    {
+     "type": "Transform",
+     "position": [
+      2.5,
+      1.25,
+      -4.5
+     ],
+     "rotation_degrees": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      0.8,
+      2.5,
+      0.8
+     ]
+    },
+    {
+     "type": "MeshRenderer",
+     "mesh": "cube",
+     "lit": true,
+     "visible": true,
+     "cast_shadows": true,
+     "material": {
+      "base_color": "#b9b2a6"
+     }
+    }
+   ]
+  },
+  {
+   "id": 7,
+   "name": "Pillar 4",
+   "parent": null,
+   "active": true,
+   "tag": "",
+   "components": [
+    {
+     "type": "Transform",
+     "position": [
+      5.5,
+      1.75,
+      -3
+     ],
+     "rotation_degrees": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      0.8,
+      3.5,
+      0.8
+     ]
+    },
+    {
+     "type": "MeshRenderer",
+     "mesh": "cube",
+     "lit": true,
+     "visible": true,
+     "cast_shadows": true,
+     "material": {
+      "base_color": "#b9b2a6"
+     }
+    }
+   ]
+  },
+  {
+   "id": 8,
+   "name": "Crate",
+   "parent": null,
+   "active": true,
+   "tag": "",
+   "components": [
+    {
+     "type": "Transform",
+     "position": [
+      -2.5,
+      0.5,
+      1.5
+     ],
+     "rotation_degrees": [
+      0,
+      20,
+      0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    {
+     "type": "MeshRenderer",
+     "mesh": "cube",
+     "lit": true,
+     "visible": true,
+     "cast_shadows": true,
+     "material": {
+      "base_color": "#a87444"
+     }
+    }
+   ]
+  },
+  {
+   "id": 9,
+   "name": "Ball",
+   "parent": null,
+   "active": true,
+   "tag": "",
+   "components": [
+    {
+     "type": "Transform",
+     "position": [
+      1.0,
+      0.6,
+      2.2
+     ],
+     "rotation_degrees": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1.2,
+      1.2,
+      1.2
+     ]
+    },
+    {
+     "type": "MeshRenderer",
+     "mesh": "sphere",
+     "lit": true,
+     "visible": true,
+     "cast_shadows": true,
+     "material": {
+      "base_color": "#d8d8e0"
+     }
+    }
+   ]
+  },
+  {
+   "id": 10,
+   "name": "Statue",
+   "parent": null,
+   "active": true,
+   "tag": "",
+   "components": [
+    {
+     "type": "Transform",
+     "position": [
+      4,
+      1.0,
+      1.5
+     ],
+     "rotation_degrees": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      0.7,
+      1.0,
+      0.7
+     ]
+    },
+    {
+     "type": "MeshRenderer",
+     "mesh": "capsule",
+     "lit": true,
+     "visible": true,
+     "cast_shadows": true,
+     "material": {
+      "base_color": "#e8e2d0"
+     }
+    }
+   ]
+  },
+  {
+   "id": 11,
+   "name": "Warm Lamp",
+   "parent": null,
+   "active": true,
+   "tag": "",
+   "components": [
+    {
+     "type": "Transform",
+     "position": [
+      -4,
+      1.4,
+      0.5
+     ],
+     "rotation_degrees": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      0.25,
+      0.25,
+      0.25
+     ]
+    },
+    {
+     "type": "Light",
+     "light_type": "point",
+     "color": "#ff9a40",
+     "intensity": 1.8,
+     "range": 6,
+     "spot_angle": 45,
+     "shadows": true
+    },
+    {
+     "type": "MeshRenderer",
+     "mesh": "sphere",
+     "lit": true,
+     "visible": true,
+     "cast_shadows": false,
+     "material": {
+      "base_color": "#202020",
+      "emissive": "#ffb060"
+     }
+    },
+    {
+     "type": "Script",
+     "path": "scripts/flicker.gro",
+     "enabled": true
+    }
+   ]
+  },
+  {
+   "id": 12,
+   "name": "Cool Lamp",
+   "parent": null,
+   "active": true,
+   "tag": "",
+   "components": [
+    {
+     "type": "Transform",
+     "position": [
+      3,
+      1.2,
+      -1.5
+     ],
+     "rotation_degrees": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      0.25,
+      0.25,
+      0.25
+     ]
+    },
+    {
+     "type": "Light",
+     "light_type": "point",
+     "color": "#4f8cff",
+     "intensity": 1.6,
+     "range": 6,
+     "spot_angle": 45,
+     "shadows": true
+    },
+    {
+     "type": "MeshRenderer",
+     "mesh": "sphere",
+     "lit": true,
+     "visible": true,
+     "cast_shadows": false,
+     "material": {
+      "base_color": "#202020",
+      "emissive": "#80b0ff"
+     }
+    }
+   ]
+  },
+  {
+   "id": 13,
+   "name": "Orbiter",
+   "parent": null,
+   "active": true,
+   "tag": "",
+   "components": [
+    {
+     "type": "Transform",
+     "position": [
+      0,
+      1.2,
+      2
+     ],
+     "rotation_degrees": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      0.2,
+      0.2,
+      0.2
+     ]
+    },
+    {
+     "type": "Light",
+     "light_type": "point",
+     "color": "#50ff7a",
+     "intensity": 1.4,
+     "range": 4.5,
+     "spot_angle": 45,
+     "shadows": true
+    },
+    {
+     "type": "MeshRenderer",
+     "mesh": "sphere",
+     "lit": true,
+     "visible": true,
+     "cast_shadows": false,
+     "material": {
+      "base_color": "#202020",
+      "emissive": "#90ffb0"
+     }
+    },
+    {
+     "type": "Script",
+     "path": "scripts/orbit.gro",
+     "enabled": true
+    }
+   ]
+  },
+  {
+   "id": 14,
+   "name": "Spot",
+   "parent": null,
+   "active": true,
+   "tag": "",
+   "components": [
+    {
+     "type": "Transform",
+     "position": [
+      4,
+      5,
+      4
+     ],
+     "rotation_degrees": [
+      -60,
+      0,
+      0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    {
+     "type": "Light",
+     "light_type": "spot",
+     "color": "#fff6e0",
+     "intensity": 2.0,
+     "range": 9,
+     "spot_angle": 38,
+     "shadows": true
+    }
+   ]
+  },
+  {
+   "id": 15,
+   "name": "Crystal",
+   "parent": null,
+   "active": true,
+   "tag": "",
+   "components": [
+    {
+     "type": "Transform",
+     "position": [
+      -1,
+      0.9,
+      -1.5
+     ],
+     "rotation_degrees": [
+      0,
+      0,
+      15
+     ],
+     "scale": [
+      0.5,
+      0.9,
+      0.5
+     ]
+    },
+    {
+     "type": "MeshRenderer",
+     "mesh": "capsule",
+     "lit": true,
+     "visible": true,
+     "cast_shadows": true,
+     "material": {
+      "base_color": "#103028",
+      "emissive": "#40ffd0"
+     }
+    },
+    {
+     "type": "Script",
+     "path": "scripts/pulse.gro",
+     "enabled": true
+    }
+   ]
+  },
+  {
+   "id": 16,
+   "name": "Rune Slab",
+   "parent": null,
+   "active": true,
+   "tag": "",
+   "components": [
+    {
+     "type": "Transform",
+     "position": [
+      0,
+      0.08,
+      4.2
+     ],
+     "rotation_degrees": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      2.2,
+      0.16,
+      2.2
+     ]
+    },
+    {
+     "type": "MeshRenderer",
+     "mesh": "cube",
+     "lit": true,
+     "visible": true,
+     "cast_shadows": true,
+     "material": {
+      "base_color": "#5a5550",
+      "texture": "assets/textures/tiles.png",
+      "emissive": "#ff6a20",
+      "emissive_texture": "assets/textures/runes.png"
+     }
+    }
+   ]
+  }
+ ]
+}

@@ -1,0 +1,13 @@
+# A candle-like flicker: wobble the point light's intensity.
+class Flicker < Entity
+  function ready()
+    @t = 0
+    @light = self.get_component("Light")
+    @base = @light.intensity
+  end
+
+  function update(delta)
+    @t += delta
+    @light.intensity = @base + 0.25 * Math.sin(@t * 13) + 0.12 * Math.sin(@t * 31)
+  end
+end

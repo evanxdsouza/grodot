@@ -66,6 +66,8 @@ pub struct MeshRenderer {
     /// Unlit meshes ignore lighting (good for UI-like markers and skies).
     pub lit: bool,
     pub visible: bool,
+    /// Block directional light (appear in shadow maps).
+    pub cast_shadows: bool,
 }
 
 /// How a texture is sampled.
@@ -157,6 +159,11 @@ pub struct Material {
     pub alpha_cutoff: f32,
     /// Draw both sides of each triangle (needed for flat foliage cards).
     pub double_sided: bool,
+    /// Light the surface gives off by itself, added after lighting (lamps, lava,
+    /// screens). Black means no glow.
+    pub emissive: Color,
+    /// Optional texture multiplied by `emissive` (white parts glow fully).
+    pub emissive_texture: Option<String>,
 }
 
 impl Default for Material {
@@ -171,13 +178,26 @@ impl Default for Material {
             alpha_mode: AlphaMode::Opaque,
             alpha_cutoff: 0.5,
             double_sided: false,
+            emissive: Color::BLACK,
+            emissive_texture: None,
         }
     }
 }
 
 /// Names of the MeshRenderer fields that belong to its material (used by `entity.material`).
-pub const MATERIAL_FIELDS: &[&str] =
-    &["base_color", "texture", "uv_scale", "uv_offset", "filter", "wrap", "alpha_mode", "alpha_cutoff", "double_sided"];
+pub const MATERIAL_FIELDS: &[&str] = &[
+    "base_color",
+    "texture",
+    "uv_scale",
+    "uv_offset",
+    "filter",
+    "wrap",
+    "alpha_mode",
+    "alpha_cutoff",
+    "double_sided",
+    "emissive",
+    "emissive_texture",
+];
 
 impl Material {
     pub fn fields(&self) -> Vec<(&'static str, FieldValue)> {
@@ -192,6 +212,8 @@ impl Material {
             ("alpha_mode", F::Choice(self.alpha_mode.name().into(), ALPHA_MODE_NAMES)),
             ("alpha_cutoff", F::Float(self.alpha_cutoff)),
             ("double_sided", F::Bool(self.double_sided)),
+            ("emissive", F::Color(self.emissive)),
+            ("emissive_texture", F::Text(self.emissive_texture.clone().unwrap_or_default())),
         ]
     }
 
@@ -207,6 +229,13 @@ impl Material {
                 self.texture = if t.is_empty() { None } else { Some(t) };
             }
             ("texture", _) => return bad("a texture path string (or \"\" for none)"),
+            ("emissive_texture", F::Text(t)) => {
+                let t = t.trim().to_string();
+                self.emissive_texture = if t.is_empty() { None } else { Some(t) };
+            }
+            ("emissive_texture", _) => return bad("a texture path string (or \"\" for none)"),
+            ("emissive", F::Color(c)) => self.emissive = c,
+            ("emissive", _) => return bad("a Color"),
             ("uv_scale", F::Vec2(v)) if v.is_finite() => self.uv_scale = v,
             ("uv_offset", F::Vec2(v)) if v.is_finite() => self.uv_offset = v,
             ("uv_scale" | "uv_offset", _) => return bad("a Vector2"),
@@ -237,13 +266,21 @@ impl Material {
         if let Some(t) = &self.texture {
             j = j.with("texture", t.as_str());
         }
-        j.with("uv_scale", Json::Arr(vec![Json::from(self.uv_scale.x), Json::from(self.uv_scale.y)]))
+        j = j
+            .with("uv_scale", Json::Arr(vec![Json::from(self.uv_scale.x), Json::from(self.uv_scale.y)]))
             .with("uv_offset", Json::Arr(vec![Json::from(self.uv_offset.x), Json::from(self.uv_offset.y)]))
             .with("filter", self.filter.name())
             .with("wrap", self.wrap.name())
             .with("alpha_mode", self.alpha_mode.name())
             .with("alpha_cutoff", self.alpha_cutoff)
-            .with("double_sided", self.double_sided)
+            .with("double_sided", self.double_sided);
+        if self.emissive != Color::BLACK {
+            j = j.with("emissive", self.emissive.to_hex());
+        }
+        if let Some(t) = &self.emissive_texture {
+            j = j.with("emissive_texture", t.as_str());
+        }
+        j
     }
 
     pub fn from_json(j: &Json) -> Result<Material, String> {
@@ -296,6 +333,16 @@ impl Material {
         }
         if let Some(v) = j.get("double_sided") {
             m.double_sided = v.as_bool().ok_or_else(|| ctx("double_sided", "true or false"))?;
+        }
+        if let Some(v) = j.get("emissive") {
+            m.emissive =
+                v.as_str().and_then(Color::from_hex).ok_or_else(|| ctx("emissive", "a hex colour like \"#ff8800\""))?;
+        }
+        match j.get("emissive_texture") {
+            None | Some(Json::Null) => {}
+            Some(Json::Str(s)) if s.is_empty() => {}
+            Some(Json::Str(s)) => m.emissive_texture = Some(s.clone()),
+            Some(_) => return Err(ctx("emissive_texture", "a string")),
         }
         Ok(m)
     }
@@ -369,8 +416,54 @@ pub struct Script {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Light {
+    pub kind: LightKind,
     pub color: Color,
     pub intensity: f32,
+    /// Point and spot lights: distance (metres) at which the light fades to nothing.
+    pub range: f32,
+    /// Spot lights: full cone angle in degrees.
+    pub spot_angle: f32,
+    /// Directional lights: cast real shadows (a shadow map rendered each frame).
+    pub shadows: bool,
+}
+
+impl Default for Light {
+    fn default() -> Self {
+        Light {
+            kind: LightKind::Directional,
+            color: Color::WHITE,
+            intensity: 1.0,
+            range: 10.0,
+            spot_angle: 45.0,
+            shadows: true,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LightKind {
+    /// Sunlight: parallel rays along the entity's forward (-Z) direction.
+    Directional,
+    /// A bulb: shines in every direction from the entity's position.
+    Point,
+    /// A torch: a cone along the entity's forward direction.
+    Spot,
+}
+
+pub const LIGHT_KIND_NAMES: &[&str] = &["directional", "point", "spot"];
+
+impl LightKind {
+    pub fn name(self) -> &'static str {
+        LIGHT_KIND_NAMES[self as usize]
+    }
+    pub fn parse(s: &str) -> Option<Self> {
+        Some(match s {
+            "directional" | "sun" => LightKind::Directional,
+            "point" => LightKind::Point,
+            "spot" => LightKind::Spot,
+            _ => return None,
+        })
+    }
 }
 
 /// Marks a skinned glTF model as animated: its MeshRenderer's model is drawn
@@ -477,6 +570,7 @@ impl Component {
                 material: Material::default(),
                 lit: true,
                 visible: true,
+                cast_shadows: true,
             }),
             "RigidBody" => Component::RigidBody(RigidBody {
                 body_type: BodyType::Dynamic,
@@ -500,7 +594,7 @@ impl Component {
                 autoplay: false,
             }),
             "Script" => Component::Script(Script { path: String::new(), enabled: true }),
-            "Light" => Component::Light(Light { color: Color::WHITE, intensity: 1.0 }),
+            "Light" => Component::Light(Light::default()),
             "Skeleton" => Component::Skeleton(Skeleton { skin: 0, show_bones: false }),
             "AnimationPlayer" => Component::AnimationPlayer(AnimationPlayer {
                 clip: String::new(),
@@ -544,6 +638,7 @@ impl Component {
                 f.extend(m.material.fields());
                 f.push(("lit", F::Bool(m.lit)));
                 f.push(("visible", F::Bool(m.visible)));
+                f.push(("cast_shadows", F::Bool(m.cast_shadows)));
                 f
             }
             Component::RigidBody(b) => vec![
@@ -568,7 +663,14 @@ impl Component {
                 ("autoplay", F::Bool(a.autoplay)),
             ],
             Component::Script(s) => vec![("path", F::Text(s.path.clone())), ("enabled", F::Bool(s.enabled))],
-            Component::Light(l) => vec![("color", F::Color(l.color)), ("intensity", F::Float(l.intensity))],
+            Component::Light(l) => vec![
+                ("light_type", F::Choice(l.kind.name().into(), LIGHT_KIND_NAMES)),
+                ("color", F::Color(l.color)),
+                ("intensity", F::Float(l.intensity)),
+                ("range", F::Float(l.range)),
+                ("spot_angle", F::Float(l.spot_angle)),
+                ("shadows", F::Bool(l.shadows)),
+            ],
             Component::Skeleton(k) => vec![("skin", F::Float(k.skin as f32)), ("show_bones", F::Bool(k.show_bones))],
             Component::AnimationPlayer(a) => vec![
                 ("clip", F::Text(a.clip.clone())),
@@ -659,6 +761,10 @@ impl Component {
             },
             (Component::MeshRenderer(m), "visible") => match v {
                 F::Bool(b) => m.visible = b,
+                _ => return bad(),
+            },
+            (Component::MeshRenderer(m), "cast_shadows") => match v {
+                F::Bool(b) => m.cast_shadows = b,
                 _ => return bad(),
             },
             (Component::MeshRenderer(m), field) => {
@@ -762,6 +868,19 @@ impl Component {
                     f.max(0.0)
                 }
             }
+            (Component::Light(l), "light_type" | "type") => match v {
+                F::Choice(s, _) | F::Text(s) => {
+                    l.kind = LightKind::parse(&s)
+                        .ok_or_else(|| format!("Light type must be one of {}", LIGHT_KIND_NAMES.join(", ")))?
+                }
+                _ => return bad(),
+            },
+            (Component::Light(l), "range") => l.range = fnum?.max(0.01),
+            (Component::Light(l), "spot_angle") => l.spot_angle = fnum?.clamp(1.0, 179.0),
+            (Component::Light(l), "shadows") => match v {
+                F::Bool(b) => l.shadows = b,
+                _ => return bad(),
+            },
             (Component::Skeleton(k), "skin") => k.skin = fnum?.max(0.0) as u32,
             (Component::Skeleton(k), "show_bones") => match v {
                 F::Bool(b) => k.show_bones = b,
@@ -808,7 +927,8 @@ impl Component {
                 .with("mesh", m.mesh.as_str())
                 .with("material", m.material.to_json())
                 .with("lit", m.lit)
-                .with("visible", m.visible),
+                .with("visible", m.visible)
+                .with("cast_shadows", m.cast_shadows),
             Component::RigidBody(b) => base
                 .with("body_type", b.body_type.name())
                 .with("mass", b.mass)
@@ -828,7 +948,13 @@ impl Component {
                 .with("looping", a.looping)
                 .with("autoplay", a.autoplay),
             Component::Script(s) => base.with("path", s.path.as_str()).with("enabled", s.enabled),
-            Component::Light(l) => base.with("color", l.color.to_hex()).with("intensity", l.intensity),
+            Component::Light(l) => base
+                .with("light_type", l.kind.name())
+                .with("color", l.color.to_hex())
+                .with("intensity", l.intensity)
+                .with("range", l.range)
+                .with("spot_angle", l.spot_angle)
+                .with("shadows", l.shadows),
             Component::Skeleton(k) => base.with("skin", k.skin as u64).with("show_bones", k.show_bones),
             Component::AnimationPlayer(a) => base
                 .with("clip", a.clip.as_str())
@@ -962,6 +1088,9 @@ impl Component {
                 if let Some(v) = bool_of("visible")? {
                     m.visible = v;
                 }
+                if let Some(v) = bool_of("cast_shadows")? {
+                    m.cast_shadows = v;
+                }
             }
             Component::RigidBody(b) => {
                 if let Some(v) = str_of("body_type")? {
@@ -1034,6 +1163,20 @@ impl Component {
                 }
                 if let Some(v) = f32_of("intensity")? {
                     l.intensity = v;
+                }
+                if let Some(v) = str_of("light_type")? {
+                    l.kind = LightKind::parse(&v).ok_or_else(|| {
+                        format!("Light.light_type must be directional, point or spot (got \"{}\")", v)
+                    })?;
+                }
+                if let Some(v) = f32_of("range")? {
+                    l.range = v.max(0.01);
+                }
+                if let Some(v) = f32_of("spot_angle")? {
+                    l.spot_angle = v.clamp(1.0, 179.0);
+                }
+                if let Some(v) = bool_of("shadows")? {
+                    l.shadows = v;
                 }
             }
             Component::Skeleton(k) => {

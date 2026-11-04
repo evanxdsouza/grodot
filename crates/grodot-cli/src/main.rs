@@ -310,6 +310,9 @@ fn check_project(dir: &Path) -> Result<usize, String> {
                 if let Some(t) = &m.material.texture {
                     need("texture", t);
                 }
+                if let Some(t) = &m.material.emissive_texture {
+                    need("emissive texture", t);
+                }
             }
             if let Some(grodot_core::Component::AudioSource(a)) = e.get("AudioSource") {
                 need("audio clip", &a.clip);

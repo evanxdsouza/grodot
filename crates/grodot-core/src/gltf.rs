@@ -83,6 +83,7 @@ pub struct GltfMaterial {
     pub base_color: Color,
     pub base_color_texture: Option<TextureRef>,
     pub emissive: Color,
+    pub emissive_texture: Option<TextureRef>,
     pub alpha_mode: AlphaMode,
     pub alpha_cutoff: f32,
     pub double_sided: bool,
@@ -95,6 +96,7 @@ impl Default for GltfMaterial {
             base_color: Color::WHITE,
             base_color_texture: None,
             emissive: Color::BLACK,
+            emissive_texture: None,
             alpha_mode: AlphaMode::Opaque,
             alpha_cutoff: 0.5,
             double_sided: false,
@@ -498,6 +500,9 @@ impl<'a> Loader<'a> {
                     }
                     mat.base_color_texture = idx(t, "index").and_then(|i| textures.get(i).cloned().flatten());
                 }
+            }
+            if let Some(t) = m.get("emissiveTexture") {
+                mat.emissive_texture = idx(t, "index").and_then(|i| textures.get(i).cloned().flatten());
             }
             let e = arr(m, "emissiveFactor");
             if e.len() == 3 {

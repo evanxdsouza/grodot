@@ -1225,7 +1225,7 @@ impl Editor {
                         let mut s = t.clone();
                         let pick = matches!(
                             (cname.as_str(), fname),
-                            ("MeshRenderer", "mesh" | "texture")
+                            ("MeshRenderer", "mesh" | "texture" | "emissive_texture")
                                 | ("AudioSource", "clip")
                                 | ("Script", "path")
                                 | ("AnimationPlayer", "clip")
@@ -1277,7 +1277,7 @@ impl Editor {
                 }
                 y += 30;
                 // Texture preview under the texture field.
-                if let (true, FieldValue::Text(t)) = (fname == "texture", &value) {
+                if let (true, FieldValue::Text(t)) = (fname == "texture" || fname == "emissive_texture", &value) {
                     if !t.is_empty() {
                         let pr = Rect::new(x0 + label_w, y, 64, 64);
                         match self.renderer.texture(t) {
@@ -1372,7 +1372,7 @@ fn asset_options(assets: &[String], comp: &str, field: &str) -> Vec<String> {
                 opts.extend(assets.iter().filter(|a| a.to_lowercase().ends_with(".wav")).cloned())
             }
             ("Script", "path") => opts.extend(assets.iter().filter(|a| a.ends_with(".gro")).cloned()),
-            ("MeshRenderer", "texture") => {
+            ("MeshRenderer", "texture" | "emissive_texture") => {
                 opts.push(NO_TEXTURE.to_string());
                 opts.extend(assets.iter().filter(|a| grodot_render::scene_render::is_texture_path(a)).cloned());
             }

@@ -40,30 +40,175 @@ impl View {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
-pub struct Lighting {
+/// A directional light (sun), optionally with a shadow map.
+#[derive(Clone)]
+pub struct DirLight {
     /// Direction the light travels (from the light towards the scene).
     pub direction: Vec3,
     pub color: Color,
     pub intensity: f32,
+    /// The light asks for shadows (the renderer fills `shadow`).
+    pub casts_shadows: bool,
+    pub shadow: Option<Arc<ShadowMap>>,
+}
+
+/// A point light, or a spot light when `spot` is set.
+#[derive(Debug, Clone, Copy)]
+pub struct LocalLight {
+    pub position: Vec3,
+    pub color: Color,
+    pub intensity: f32,
+    pub range: f32,
+    pub spot: Option<Spot>,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct Spot {
+    /// Direction the cone points (normalized).
+    pub direction: Vec3,
+    /// Cosine of the half angle where the cone ends, and where it is at full strength.
+    pub cos_outer: f32,
+    pub cos_inner: f32,
+}
+
+impl Spot {
+    pub fn new(direction: Vec3, full_angle_deg: f32) -> Spot {
+        let half = (full_angle_deg * 0.5).to_radians();
+        Spot { direction: direction.normalized(), cos_outer: half.cos(), cos_inner: (half * 0.8).cos() }
+    }
+}
+
+/// Where lighting is computed.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LightingMode {
+    /// Every pixel is lit from its interpolated normal and position (the default).
+    PerPixel,
+    /// Lighting is computed at vertices and interpolated (Gouraud); the shadow
+    /// lookup still happens per pixel. Faster on dense scenes, blurrier point lights.
+    PerVertex,
+}
+
+/// Shadowed directional lights beyond this many are drawn without shadows.
+pub const MAX_SHADOWED_SUNS: usize = 2;
+
+#[derive(Clone)]
+pub struct Lighting {
+    pub suns: Vec<DirLight>,
+    pub locals: Vec<LocalLight>,
     pub ambient: f32,
     pub fog_color: Color,
     pub fog_start: f32,
     pub fog_end: f32,
+    pub mode: LightingMode,
 }
 
 impl Default for Lighting {
     fn default() -> Self {
         Lighting {
-            direction: Vec3 { x: -0.4, y: -1.0, z: -0.3 }.normalized(),
-            color: Color::WHITE,
-            intensity: 1.0,
+            suns: vec![DirLight {
+                direction: Vec3 { x: -0.4, y: -1.0, z: -0.3 }.normalized(),
+                color: Color::WHITE,
+                intensity: 1.0,
+                casts_shadows: false,
+                shadow: None,
+            }],
+            locals: Vec::new(),
             ambient: 0.35,
             fog_color: Color::rgb(0.6, 0.7, 0.85),
             fog_start: 60.0,
             fog_end: 200.0,
+            mode: LightingMode::PerPixel,
         }
     }
+}
+
+/// A depth map rendered from a directional light (orthographic).
+pub struct ShadowMap {
+    pub size: usize,
+    /// World -> light clip space (orthographic, so w = 1).
+    pub view_proj: Mat4,
+    /// Light-space NDC depth per texel; +inf where nothing was drawn.
+    pub depth: Vec<f32>,
+    /// World-space size of one texel (for normal-offset bias).
+    pub texel_world: f32,
+    /// NDC depth units per world metre along the light direction.
+    pub depth_per_metre: f32,
+}
+
+impl ShadowMap {
+    /// Fraction of light reaching world point `p` with normal `n`
+    /// (1 = fully lit), using 3x3 bilinear-weighted PCF (16 depth taps).
+    pub fn visibility(&self, p: Vec3, n: Vec3, to_light: Vec3) -> f32 {
+        // Normal offset: push the lookup off the surface to avoid acne,
+        // more at grazing angles where depth slopes are steep.
+        let ndl = n.dot(to_light);
+        let n = if ndl < 0.0 { -n } else { n };
+        let slope = (1.0 - ndl.abs().min(1.0)).sqrt();
+        let q = p + n * (self.texel_world * (0.8 + 1.5 * slope));
+        let c = self.view_proj.transform_point(q);
+        if c.x.abs() >= 1.0 || c.y.abs() >= 1.0 || c.z > 1.0 {
+            return 1.0;
+        }
+        let size = self.size as f32;
+        let u = (c.x * 0.5 + 0.5) * size - 0.5;
+        let v = (1.0 - (c.y * 0.5 + 0.5)) * size - 0.5;
+        let (iu, iv) = (u.floor() as i32, v.floor() as i32);
+        let (fu, fv) = (u - iu as f32, v - iv as f32);
+        let z = c.z - self.texel_world * self.depth_per_metre * 0.5;
+        let wx = [1.0 - fu, 1.0, 1.0, fu];
+        let wy = [1.0 - fv, 1.0, 1.0, fv];
+        let n = self.size as i32;
+        let mut lit = 0.0;
+        for (dy, wyv) in wy.iter().enumerate() {
+            let y = (iv - 1 + dy as i32).clamp(0, n - 1) as usize;
+            let row = &self.depth[y * self.size..(y + 1) * self.size];
+            for (dx, wxv) in wx.iter().enumerate() {
+                let x = (iu - 1 + dx as i32).clamp(0, n - 1) as usize;
+                if z <= row[x] {
+                    lit += wxv * wyv;
+                }
+            }
+        }
+        lit / 9.0
+    }
+}
+
+/// Render the depth of shadow-casting items as seen through `view_proj`
+/// (an orthographic light camera) into a `size` x `size` shadow map. Reuses
+/// the main rasterizer's setup and depth pass; faces are not culled so thin
+/// and open meshes cast shadows too.
+pub fn render_shadow_map(
+    size: usize,
+    view_proj: Mat4,
+    texel_world: f32,
+    depth_per_metre: f32,
+    items: &[DrawItem],
+) -> ShadowMap {
+    let viewport = Rect::new(0, 0, size as i32, size as i32);
+    let mut tris = Vec::new();
+    for (i, item) in items.iter().enumerate() {
+        if item.cast_shadows && item.material.alpha_mode != AlphaMode::Blend {
+            setup(item, i as u32, &view_proj, viewport, false, None, &mut tris);
+        }
+    }
+    let mut depth = vec![f32::INFINITY; size * size];
+    let mut vis = vec![u32::MAX; size * size];
+    let n = threads();
+    let band_h = size.div_ceil(n).max(16);
+    let tris = &tris;
+    std::thread::scope(|s| {
+        for (i, (db, vb)) in depth.chunks_mut(band_h * size).zip(vis.chunks_mut(band_h * size)).enumerate() {
+            let rows = db.len() / size;
+            let band = Rect::new(0, (i * band_h) as i32, size as i32, rows as i32);
+            let mut work = move || raster_band(db, vb, size, band, tris, items);
+            if n == 1 {
+                work();
+            } else {
+                s.spawn(work);
+            }
+        }
+    });
+    ShadowMap { size, view_proj, depth, texel_world, depth_per_metre }
 }
 
 /// A material ready for rendering (textures resolved).
@@ -79,6 +224,9 @@ pub struct RMaterial {
     pub alpha_cutoff: f32,
     pub double_sided: bool,
     pub lit: bool,
+    /// Added after lighting (glow). Multiplied by `emissive_texture` when set.
+    pub emissive: [f32; 3],
+    pub emissive_texture: Option<Arc<Texture>>,
 }
 
 impl RMaterial {
@@ -94,7 +242,13 @@ impl RMaterial {
             alpha_cutoff: 0.5,
             double_sided: false,
             lit,
+            emissive: [0.0; 3],
+            emissive_texture: None,
         }
+    }
+
+    fn glows(&self) -> bool {
+        self.emissive != [0.0; 3]
     }
 }
 
@@ -102,6 +256,14 @@ pub struct DrawItem<'a> {
     pub mesh: &'a Mesh,
     pub model: Mat4,
     pub material: RMaterial,
+    /// Drawn into shadow maps.
+    pub cast_shadows: bool,
+}
+
+impl<'a> DrawItem<'a> {
+    pub fn new(mesh: &'a Mesh, model: Mat4, material: RMaterial) -> DrawItem<'a> {
+        DrawItem { mesh, model, material, cast_shadows: true }
+    }
 }
 
 /// A triangle after setup. Attributes are stored per vertex (not divided by w).
@@ -114,6 +276,9 @@ struct Tri {
     draw: u32,
     /// Rasterized from its back side (double-sided materials): the normal is flipped.
     back: bool,
+    /// Per-vertex lighting (LightingMode::PerVertex only): unshadowed light
+    /// in [0..3], then n.l x intensity for each shadowed sun.
+    vl: Option<[[f32; VL]; 3]>,
     min_x: i32,
     max_x: i32,
     min_y: i32,
@@ -143,7 +308,12 @@ pub struct Frag {
     pub duv_dy: [f32; 2],
     pub normal: Vec3,
     pub pos: Vec3,
+    /// Interpolated per-vertex lighting, when the triangle has it.
+    pub vl: Option<[f32; VL]>,
 }
+
+/// Size of the per-vertex lighting record.
+const VL: usize = 3 + MAX_SHADOWED_SUNS;
 
 #[inline]
 fn fragment(t: &Tri, px: f32, py: f32) -> Frag {
@@ -172,7 +342,14 @@ fn fragment(t: &Tri, px: f32, py: f32) -> Frag {
     if t.back {
         normal = -normal;
     }
-    Frag { uv, duv_dx, duv_dy, normal, pos: t.p[0] * b[0] + t.p[1] * b[1] + t.p[2] * b[2] }
+    let vl = t.vl.map(|v| {
+        let mut o = [0.0; VL];
+        for (k, ok) in o.iter_mut().enumerate() {
+            *ok = v[0][k] * b[0] + v[1][k] * b[1] + v[2][k] * b[2];
+        }
+        o
+    });
+    Frag { uv, duv_dx, duv_dy, normal, pos: t.p[0] * b[0] + t.p[1] * b[1] + t.p[2] * b[2], vl }
 }
 
 /// log2 of texels per pixel, the mip level to sample.
@@ -199,25 +376,125 @@ fn albedo(m: &RMaterial, f: &Frag) -> [f32; 4] {
     c
 }
 
-#[derive(Clone, Copy)]
-struct ShadeCtx {
+struct ShadeCtx<'a> {
     eye: Vec3,
-    to_light: Vec3,
-    light: Lighting,
+    light: &'a Lighting,
+    /// (to_light, colour x intensity, shadow map) per sun.
+    suns: Vec<(Vec3, [f32; 3], Option<&'a ShadowMap>)>,
+}
+
+impl<'a> ShadeCtx<'a> {
+    fn new(eye: Vec3, light: &'a Lighting) -> ShadeCtx<'a> {
+        let mut shadowed = 0;
+        let suns = light
+            .suns
+            .iter()
+            .map(|s| {
+                let c = [s.color.r * s.intensity, s.color.g * s.intensity, s.color.b * s.intensity];
+                let map = match &s.shadow {
+                    Some(m) if shadowed < MAX_SHADOWED_SUNS => {
+                        shadowed += 1;
+                        Some(&**m)
+                    }
+                    _ => None,
+                };
+                ((-s.direction).normalized(), c, map)
+            })
+            .collect();
+        ShadeCtx { eye, light, suns }
+    }
+
+    /// Light arriving at a surface, without shadow-mapped suns' shadows applied:
+    /// returns (light from everything except shadowed suns, n.l per shadowed sun).
+    #[inline]
+    fn gather(&self, n: Vec3, p: Vec3) -> [f32; VL] {
+        let mut o = [0.0; VL];
+        let sky = 0.5 + 0.5 * n.y; // hemisphere ambient
+        let amb = self.light.ambient * (0.65 + 0.35 * sky);
+        o[0] = amb;
+        o[1] = amb;
+        o[2] = amb;
+        let mut si = 0;
+        for (to_light, c, map) in &self.suns {
+            let d = n.dot(*to_light).max(0.0);
+            if map.is_some() {
+                o[3 + si] = d;
+                si += 1;
+            } else {
+                o[0] += d * c[0];
+                o[1] += d * c[1];
+                o[2] += d * c[2];
+            }
+        }
+        for l in &self.light.locals {
+            let v = l.position - p;
+            let d2 = v.dot(v);
+            let r2 = l.range * l.range;
+            if d2 >= r2 || d2 < 1e-8 {
+                continue;
+            }
+            let dist = d2.sqrt();
+            let dir = v * (1.0 / dist);
+            let ndl = n.dot(dir);
+            if ndl <= 0.0 {
+                continue;
+            }
+            // Smooth window: full strength at the bulb, zero at `range`.
+            let w = 1.0 - d2 / r2;
+            let mut att = w * w * l.intensity * ndl;
+            if let Some(s) = &l.spot {
+                let cd = -dir.dot(s.direction);
+                if cd <= s.cos_outer {
+                    continue;
+                }
+                let t = ((cd - s.cos_outer) / (s.cos_inner - s.cos_outer).max(1e-4)).min(1.0);
+                att *= t * t * (3.0 - 2.0 * t);
+            }
+            o[0] += att * l.color.r;
+            o[1] += att * l.color.g;
+            o[2] += att * l.color.b;
+        }
+        o
+    }
 }
 
 #[inline]
 fn shade(ctx: &ShadeCtx, m: &RMaterial, f: &Frag, base: [f32; 4]) -> [f32; 3] {
     let (mut r, mut g, mut b) = (base[0], base[1], base[2]);
-    let light = &ctx.light;
+    let light = ctx.light;
     if m.lit {
         let n = f.normal.normalized();
-        let diff = n.dot(ctx.to_light).max(0.0) * light.intensity;
-        let sky = 0.5 + 0.5 * n.y; // hemisphere ambient
-        let amb = light.ambient * (0.65 + 0.35 * sky);
-        r *= amb + diff * light.color.r;
-        g *= amb + diff * light.color.g;
-        b *= amb + diff * light.color.b;
+        let acc = match f.vl {
+            Some(v) => v,
+            None => ctx.gather(n, f.pos),
+        };
+        let (mut lr, mut lg, mut lb) = (acc[0], acc[1], acc[2]);
+        let mut si = 0;
+        for (to_light, c, map) in &ctx.suns {
+            if let Some(map) = map {
+                let d = acc[3 + si];
+                si += 1;
+                if d > 0.0 {
+                    let vis = map.visibility(f.pos, n, *to_light);
+                    lr += d * vis * c[0];
+                    lg += d * vis * c[1];
+                    lb += d * vis * c[2];
+                }
+            }
+        }
+        r *= lr;
+        g *= lg;
+        b *= lb;
+    }
+    if m.glows() {
+        let mut e = m.emissive;
+        if let Some(tex) = &m.emissive_texture {
+            let s = tex.sample(f.uv[0], f.uv[1], lod(tex, f), m.filter, m.wrap);
+            e = [e[0] * s[0], e[1] * s[1], e[2] * s[2]];
+        }
+        r += e[0];
+        g += e[1];
+        b += e[2];
     }
     let dist = (f.pos - ctx.eye).length();
     let fog = ((dist - light.fog_start) / (light.fog_end - light.fog_start).max(0.001)).clamp(0.0, 1.0);
@@ -230,6 +507,7 @@ struct CV {
     uv: [f32; 2],
     n: Vec3,
     p: Vec3,
+    vl: [f32; VL],
 }
 
 fn lerp_cv(a: &CV, b: &CV, t: f32) -> CV {
@@ -239,6 +517,7 @@ fn lerp_cv(a: &CV, b: &CV, t: f32) -> CV {
         uv: [l(a.uv[0], b.uv[0]), l(a.uv[1], b.uv[1])],
         n: a.n + (b.n - a.n) * t,
         p: a.p + (b.p - a.p) * t,
+        vl: std::array::from_fn(|k| l(a.vl[k], b.vl[k])),
     }
 }
 
@@ -273,23 +552,40 @@ fn normal_matrix(model: &Mat4) -> Mat4 {
     t
 }
 
-/// Transform, clip and cull one item into screen triangles.
-fn setup(item: &DrawItem, draw: u32, vp: &Mat4, viewport: Rect, out: &mut Vec<Tri>) {
+/// Transform, clip and cull one item into screen triangles. With `vertex_light`
+/// set (per-vertex mode) lighting is gathered at each vertex. With `cull` false
+/// every face is kept (shadow maps).
+fn setup(
+    item: &DrawItem,
+    draw: u32,
+    vp: &Mat4,
+    viewport: Rect,
+    cull: bool,
+    vertex_light: Option<&ShadeCtx>,
+    out: &mut Vec<Tri>,
+) {
     let (vx, vy, vw, vh) = (viewport.x as f32, viewport.y as f32, viewport.w as f32, viewport.h as f32);
     let mvp = *vp * item.model;
     let nm = normal_matrix(&item.model);
     let m = &item.material;
     let mesh = item.mesh;
+    let vertex_light = vertex_light.filter(|_| m.lit);
     let verts: Vec<CV> = (0..mesh.positions.len())
         .map(|i| {
             let p = mesh.positions[i];
             let c = mvp.transform4(p);
             let uv = mesh.uvs.get(i).copied().unwrap_or_default();
+            let n = nm.transform_vector(mesh.normals.get(i).copied().unwrap_or(Vec3::Y));
+            let wp = item.model.transform_point(p);
             CV {
                 c: [c.x, c.y, c.z, c.w],
                 uv: [uv.x * m.uv_scale[0] + m.uv_offset[0], uv.y * m.uv_scale[1] + m.uv_offset[1]],
-                n: nm.transform_vector(mesh.normals.get(i).copied().unwrap_or(Vec3::Y)),
-                p: item.model.transform_point(p),
+                vl: match vertex_light {
+                    Some(ctx) => ctx.gather(n.normalized(), wp),
+                    None => [0.0; VL],
+                },
+                n,
+                p: wp,
             }
         })
         .collect();
@@ -333,7 +629,7 @@ fn setup(item: &DrawItem, draw: u32, vp: &Mat4, viewport: Rect, out: &mut Vec<Tr
             // Front faces are counter-clockwise, which is negative area with y pointing down.
             let mut back = false;
             if area > 0.0 {
-                if !m.double_sided {
+                if cull && !m.double_sided {
                     continue;
                 }
                 idx.swap(1, 2);
@@ -372,6 +668,7 @@ fn setup(item: &DrawItem, draw: u32, vp: &Mat4, viewport: Rect, out: &mut Vec<Tr
                 p: [pv(0).p, pv(1).p, pv(2).p],
                 draw,
                 back,
+                vl: vertex_light.map(|_| [pv(0).vl, pv(1).vl, pv(2).vl]),
                 min_x,
                 max_x,
                 min_y,
@@ -398,6 +695,8 @@ pub fn draw_meshes(canvas: &mut Canvas, viewport: Rect, view: &View, light: &Lig
         return;
     }
     let vp = view.view_proj();
+    let ctx = ShadeCtx::new(view.eye, light);
+    let vertex_light = (light.mode == LightingMode::PerVertex).then_some(&ctx);
     let mut opaque: Vec<Tri> = Vec::new();
     let mut blended: Vec<(f32, usize)> = Vec::new();
     for (i, item) in items.iter().enumerate() {
@@ -408,16 +707,16 @@ pub fn draw_meshes(canvas: &mut Canvas, viewport: Rect, view: &View, light: &Lig
             });
             blended.push(((centre - view.eye).length(), i));
         } else {
-            setup(item, i as u32, &vp, viewport, &mut opaque);
+            setup(item, i as u32, &vp, viewport, true, vertex_light, &mut opaque);
         }
     }
     // Back to front; ties keep submission order so results are deterministic.
     blended.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap_or(std::cmp::Ordering::Equal).then(a.1.cmp(&b.1)));
     let mut blend_tris: Vec<Tri> = Vec::new();
     for &(_, i) in &blended {
-        setup(&items[i], i as u32, &vp, viewport, &mut blend_tris);
+        setup(&items[i], i as u32, &vp, viewport, true, vertex_light, &mut blend_tris);
     }
-    let ctx = ShadeCtx { eye: view.eye, to_light: (-light.direction).normalized(), light: *light };
+    let ctx = &ctx;
 
     let width = canvas.width;
     let n = threads();
@@ -437,8 +736,8 @@ pub fn draw_meshes(canvas: &mut Canvas, viewport: Rect, view: &View, light: &Lig
             let band = Rect::new(vpr.x, vpr.y + (i * band_h) as i32, vpr.w, rows as i32);
             let mut work = move || {
                 raster_band(db, vb, width, band, opaque, items);
-                shade_band(cb, vb, width, band, opaque, items, &ctx);
-                blend_band(cb, db, width, band, blend_tris, items, &ctx);
+                shade_band(cb, vb, width, band, opaque, items, ctx);
+                blend_band(cb, db, width, band, blend_tris, items, ctx);
             };
             if n == 1 {
                 work();
@@ -706,7 +1005,7 @@ mod tests {
         let (view, vpr) = view_looking_down_z(200, 100);
         let mut canvas = Canvas::new(200, 100);
         canvas.clear(0);
-        draw_meshes(&mut canvas, vpr, &view, &Lighting::default(), &[DrawItem { mesh: &mesh, model, material: mat }]);
+        draw_meshes(&mut canvas, vpr, &view, &Lighting::default(), &[DrawItem::new(&mesh, model, mat)]);
         // Where does the plane's middle (u = 0.5) project?
         let mid = raster_mid_x(&view, vpr, &model);
         let row = 50;
@@ -736,7 +1035,7 @@ mod tests {
         let mut canvas = Canvas::new(100, 100);
         canvas.clear(0x112233);
         let model = Mat4::from_trs(Vec3::ZERO, Quat::IDENTITY, vec3(2.0, 2.0, 1.0));
-        draw_meshes(&mut canvas, vpr, &view, &Lighting::default(), &[DrawItem { mesh: &mesh, model, material: mat }]);
+        draw_meshes(&mut canvas, vpr, &view, &Lighting::default(), &[DrawItem::new(&mesh, model, mat)]);
         let (cx, _) = project(&view, vpr, Vec3::ZERO).unwrap();
         let l = canvas.color[50 * 100 + (cx - 10.0) as usize];
         let r = canvas.color[50 * 100 + (cx + 10.0) as usize];
@@ -754,7 +1053,7 @@ mod tests {
         let mut canvas = Canvas::new(40, 40);
         canvas.clear(0x000000);
         let model = Mat4::from_trs(Vec3::ZERO, Quat::IDENTITY, Vec3::ONE);
-        draw_meshes(&mut canvas, vpr, &view, &Lighting::default(), &[DrawItem { mesh: &mesh, model, material: mat }]);
+        draw_meshes(&mut canvas, vpr, &view, &Lighting::default(), &[DrawItem::new(&mesh, model, mat)]);
         let c = canvas.color[20 * 40 + 20];
         let r = (c >> 16) & 0xff;
         assert!((110..=150).contains(&r), "half-transparent white over black is grey, got {}", r);
@@ -770,14 +1069,49 @@ mod tests {
             mat.double_sided = double;
             let mut canvas = Canvas::new(40, 40);
             canvas.clear(0);
-            draw_meshes(
-                &mut canvas,
-                vpr,
-                &view,
-                &Lighting::default(),
-                &[DrawItem { mesh: &mesh, model, material: mat }],
-            );
+            draw_meshes(&mut canvas, vpr, &view, &Lighting::default(), &[DrawItem::new(&mesh, model, mat)]);
             assert_eq!(canvas.color[20 * 40 + 20] != 0, double);
         }
+    }
+
+    #[test]
+    fn sun_shadow_blocks_light_behind_a_caster() {
+        // A cube hangs over the origin; the sun comes in tilted towards +X.
+        let floor = Mesh::plane();
+        let cube = Mesh::primitive("cube").unwrap();
+        let floor_model = Mat4::from_trs(Vec3::ZERO, Quat::IDENTITY, vec3(20.0, 1.0, 20.0));
+        let cube_model = Mat4::from_trs(vec3(0.0, 1.0, 0.0), Quat::IDENTITY, Vec3::ONE);
+        let mut floor_item = DrawItem::new(&floor, floor_model, RMaterial::solid(Color::WHITE, true));
+        floor_item.cast_shadows = false;
+        let items = [floor_item, DrawItem::new(&cube, cube_model, RMaterial::solid(Color::WHITE, true))];
+        let (view, _) = view_looking_down_z(100, 100);
+        let dir = vec3(0.3, -1.0, 0.0).normalized();
+        let (vp, texel, dpm) = crate::scene_render::shadow_camera(&view, dir, 512, 40.0);
+        let map = render_shadow_map(512, vp, texel, dpm, &items);
+        let to_light = (-dir).normalized();
+        let up = Vec3::Y;
+        // Directly under the cube: the light path crosses it, so the point is in shadow.
+        let shadowed = map.visibility(Vec3::ZERO, up, to_light);
+        assert!(shadowed < 0.5, "under the cube should be shadowed, got {}", shadowed);
+        // Well away from the cube's shadow: fully lit.
+        let lit = map.visibility(vec3(6.0, 0.0, 0.0), up, to_light);
+        assert!(lit > 0.99, "clear floor should be lit, got {}", lit);
+    }
+
+    #[test]
+    fn point_light_falls_off_to_zero_at_its_range() {
+        let mut lighting = Lighting { suns: Vec::new(), ambient: 0.0, ..Default::default() };
+        lighting.locals.push(LocalLight {
+            position: vec3(0.0, 1.0, 0.0),
+            color: Color::WHITE,
+            intensity: 1.0,
+            range: 2.0,
+            spot: None,
+        });
+        let ctx = ShadeCtx::new(vec3(0.0, 0.0, 10.0), &lighting);
+        let near = ctx.gather(Vec3::Y, vec3(0.0, 0.0, 0.0))[0];
+        let far = ctx.gather(Vec3::Y, vec3(0.0, 2.5, 0.0))[0];
+        assert!(near > 0.5, "a point near the bulb is bright, got {}", near);
+        assert_eq!(far, 0.0, "beyond the range there is no light");
     }
 }
