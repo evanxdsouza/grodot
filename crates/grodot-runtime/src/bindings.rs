@@ -372,7 +372,10 @@ impl HostObject for EntityHandle {
             })(),
             "connect" => (|| {
                 if args.len() != 3 {
-                    return Err(GroError::new(ErrorKind::Type, "connect() expects a signal, target entity and method name"));
+                    return Err(GroError::new(
+                        ErrorKind::Type,
+                        "connect() expects a signal, target entity and method name",
+                    ));
                 }
                 let signal = str_arg(args, 0, name)?;
                 let target = entity_id_of(&args[1])
@@ -389,7 +392,12 @@ impl HostObject for EntityHandle {
                 if !w.is_alive(target) {
                     return engine_err(format!("connect() target entity {} is not alive", target));
                 }
-                let connection = SignalConnection { source: self.id, signal: signal.to_string(), target, method: method.to_string() };
+                let connection = SignalConnection {
+                    source: self.id,
+                    signal: signal.to_string(),
+                    target,
+                    method: method.to_string(),
+                };
                 if w.signal_connections.contains(&connection) {
                     Ok(Value::Bool(false))
                 } else {
@@ -399,7 +407,10 @@ impl HostObject for EntityHandle {
             })(),
             "disconnect" | "is_connected?" => (|| {
                 if args.len() != 3 {
-                    return Err(GroError::new(ErrorKind::Type, format!("{}() expects a signal, target and method", name)));
+                    return Err(GroError::new(
+                        ErrorKind::Type,
+                        format!("{}() expects a signal, target and method", name),
+                    ));
                 }
                 let signal = str_arg(args, 0, name)?;
                 let target = entity_id_of(&args[1])
@@ -410,7 +421,12 @@ impl HostObject for EntityHandle {
                     drop(w);
                     return Err(self.dead());
                 }
-                let connection = SignalConnection { source: self.id, signal: signal.to_string(), target, method: method.to_string() };
+                let connection = SignalConnection {
+                    source: self.id,
+                    signal: signal.to_string(),
+                    target,
+                    method: method.to_string(),
+                };
                 if name == "is_connected?" {
                     Ok(Value::Bool(w.signal_connections.contains(&connection)))
                 } else {
@@ -432,7 +448,11 @@ impl HostObject for EntityHandle {
                     drop(w);
                     return Err(self.dead());
                 }
-                w.signal_events.push_back(SignalEvent { source: self.id, signal: signal.to_string(), args: args[1..].to_vec() });
+                w.signal_events.push_back(SignalEvent {
+                    source: self.id,
+                    signal: signal.to_string(),
+                    args: args[1..].to_vec(),
+                });
                 Ok(Value::Nil)
             })(),
             "add_to_group" => (|| {

@@ -3,8 +3,7 @@
 use grodot_core::math::{Color, Vec3};
 use grodot_core::scene::{EntityId, Scene};
 use groscript::Value;
-use std::collections::{BTreeMap, HashMap, HashSet};
-use std::collections::VecDeque;
+use std::collections::{BTreeMap, HashMap, HashSet, VecDeque};
 use std::path::PathBuf;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
