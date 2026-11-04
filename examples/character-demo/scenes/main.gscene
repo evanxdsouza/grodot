@@ -1,0 +1,415 @@
+{
+ "scene_version": 1,
+ "name": "Main",
+ "environment": {
+  "background": "#8db7e6",
+  "ambient": 0.5
+ },
+ "entities": [
+  {
+   "id": 1,
+   "name": "Camera",
+   "parent": null,
+   "active": true,
+   "tag": "",
+   "components": [
+    {
+     "type": "Transform",
+     "position": [
+      0,
+      3.2,
+      6
+     ],
+     "rotation_degrees": [
+      -18,
+      0,
+      0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    {
+     "type": "Camera",
+     "fov": 55,
+     "near": 0.1,
+     "far": 200,
+     "active": true
+    },
+    {
+     "type": "Script",
+     "path": "scripts/camera_follow.gro",
+     "enabled": true
+    }
+   ]
+  },
+  {
+   "id": 2,
+   "name": "Sun",
+   "parent": null,
+   "active": true,
+   "tag": "",
+   "components": [
+    {
+     "type": "Transform",
+     "position": [
+      0,
+      10,
+      0
+     ],
+     "rotation_degrees": [
+      -50,
+      35,
+      0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    {
+     "type": "Light",
+     "color": "#fff1d6",
+     "intensity": 1.05
+    }
+   ]
+  },
+  {
+   "id": 3,
+   "name": "Ground",
+   "parent": null,
+   "active": true,
+   "tag": "",
+   "components": [
+    {
+     "type": "Transform",
+     "position": [
+      0,
+      0,
+      0
+     ],
+     "rotation_degrees": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      30,
+      1,
+      30
+     ]
+    },
+    {
+     "type": "MeshRenderer",
+     "mesh": "plane",
+     "lit": true,
+     "visible": true,
+     "material": {
+      "base_color": "#ffffff",
+      "texture": "assets/textures/grass.png",
+      "uv_scale": [
+       10,
+       10
+      ]
+     }
+    },
+    {
+     "type": "Collider",
+     "shape": "box",
+     "size": [
+      1,
+      0.01,
+      1
+     ],
+     "offset": [
+      0,
+      0,
+      0
+     ]
+    }
+   ]
+  },
+  {
+   "id": 4,
+   "name": "Hero",
+   "parent": null,
+   "active": true,
+   "tag": "player",
+   "components": [
+    {
+     "type": "Transform",
+     "position": [
+      0,
+      0.02,
+      0
+     ],
+     "rotation_degrees": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    {
+     "type": "MeshRenderer",
+     "mesh": "assets/models/hero.glb",
+     "lit": true,
+     "visible": true,
+     "material": {
+      "base_color": "#ffffff"
+     }
+    },
+    {
+     "type": "Skeleton",
+     "skin": 0,
+     "show_bones": false
+    },
+    {
+     "type": "AnimationPlayer",
+     "clip": "idle",
+     "autoplay": true,
+     "looping": true,
+     "speed": 1,
+     "crossfade": 0.2
+    },
+    {
+     "type": "Collider",
+     "shape": "box",
+     "size": [
+      0.6,
+      1.8,
+      0.6
+     ],
+     "offset": [
+      0,
+      0.9,
+      0
+     ]
+    },
+    {
+     "type": "RigidBody",
+     "body_type": "dynamic",
+     "mass": 1,
+     "velocity": [
+      0,
+      0,
+      0
+     ],
+     "gravity": true
+    },
+    {
+     "type": "Script",
+     "path": "scripts/hero.gro",
+     "enabled": true
+    }
+   ]
+  },
+  {
+   "id": 5,
+   "name": "Crate A",
+   "parent": null,
+   "active": true,
+   "tag": "",
+   "components": [
+    {
+     "type": "Transform",
+     "position": [
+      3,
+      0.5,
+      -2
+     ],
+     "rotation_degrees": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    {
+     "type": "MeshRenderer",
+     "mesh": "cube",
+     "lit": true,
+     "visible": true,
+     "material": {
+      "base_color": "#b07a45"
+     }
+    },
+    {
+     "type": "Collider",
+     "shape": "box",
+     "size": [
+      1,
+      1,
+      1
+     ],
+     "offset": [
+      0,
+      0,
+      0
+     ]
+    }
+   ]
+  },
+  {
+   "id": 6,
+   "name": "Crate B",
+   "parent": null,
+   "active": true,
+   "tag": "",
+   "components": [
+    {
+     "type": "Transform",
+     "position": [
+      -3.5,
+      0.5,
+      -3
+     ],
+     "rotation_degrees": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    {
+     "type": "MeshRenderer",
+     "mesh": "cube",
+     "lit": true,
+     "visible": true,
+     "material": {
+      "base_color": "#b07a45"
+     }
+    },
+    {
+     "type": "Collider",
+     "shape": "box",
+     "size": [
+      1,
+      1,
+      1
+     ],
+     "offset": [
+      0,
+      0,
+      0
+     ]
+    }
+   ]
+  },
+  {
+   "id": 7,
+   "name": "Step",
+   "parent": null,
+   "active": true,
+   "tag": "",
+   "components": [
+    {
+     "type": "Transform",
+     "position": [
+      -2,
+      0.25,
+      2.5
+     ],
+     "rotation_degrees": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      2,
+      0.5,
+      2
+     ]
+    },
+    {
+     "type": "MeshRenderer",
+     "mesh": "cube",
+     "lit": true,
+     "visible": true,
+     "material": {
+      "base_color": "#9a9a9a"
+     }
+    },
+    {
+     "type": "Collider",
+     "shape": "box",
+     "size": [
+      1,
+      1,
+      1
+     ],
+     "offset": [
+      0,
+      0,
+      0
+     ]
+    }
+   ]
+  },
+  {
+   "id": 8,
+   "name": "Pillar",
+   "parent": null,
+   "active": true,
+   "tag": "",
+   "components": [
+    {
+     "type": "Transform",
+     "position": [
+      4,
+      1.5,
+      3
+     ],
+     "rotation_degrees": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      0.8,
+      3,
+      0.8
+     ]
+    },
+    {
+     "type": "MeshRenderer",
+     "mesh": "cube",
+     "lit": true,
+     "visible": true,
+     "material": {
+      "base_color": "#c9b48a"
+     }
+    },
+    {
+     "type": "Collider",
+     "shape": "box",
+     "size": [
+      1,
+      1,
+      1
+     ],
+     "offset": [
+      0,
+      0,
+      0
+     ]
+    }
+   ]
+  }
+ ]
+}

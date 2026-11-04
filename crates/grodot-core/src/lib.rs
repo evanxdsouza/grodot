@@ -1,6 +1,7 @@
 //! Shared data types for Grodot: math, JSON, project configuration and the
 //! scene/entity/component model. This crate has no dependencies.
 
+pub mod animation;
 pub mod config;
 pub mod gltf;
 pub mod image;

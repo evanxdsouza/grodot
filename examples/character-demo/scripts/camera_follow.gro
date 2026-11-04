@@ -1,0 +1,17 @@
+# Follows the hero from behind and above.
+class CameraFollow < Entity
+  OFFSET = Vector3.new(0, 3.2, 6)
+
+  function ready()
+    @target = Scene.find("Hero")
+  end
+
+  function update(delta)
+    if @target == nil or not @target.valid?()
+      return
+    end
+    goal = @target.position + OFFSET
+    self.position = self.position.lerp(goal, Math.min(1, delta * 5))
+    self.look_at(@target.position + Vector3.new(0, 1, 0))
+  end
+end

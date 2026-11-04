@@ -5,6 +5,7 @@
 //! render `world.scene`. This makes the whole game loop testable without a GPU
 //! or display.
 
+pub mod animation;
 pub mod bindings;
 pub mod physics;
 pub mod runtime;

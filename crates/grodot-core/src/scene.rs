@@ -373,6 +373,29 @@ pub struct Light {
     pub intensity: f32,
 }
 
+/// Marks a skinned glTF model as animated: its MeshRenderer's model is drawn
+/// with the joints posed by the AnimationPlayer (or in bind pose without one).
+#[derive(Debug, Clone, PartialEq)]
+pub struct Skeleton {
+    /// Which skin of the model to use (most files have exactly one).
+    pub skin: u32,
+    /// Draw the joint hierarchy as lines (debugging aid, editor and game).
+    pub show_bones: bool,
+}
+
+/// Plays the animation clips stored in the entity's glTF model.
+#[derive(Debug, Clone, PartialEq)]
+pub struct AnimationPlayer {
+    /// Clip name to play when the scene starts (with `autoplay`).
+    pub clip: String,
+    pub autoplay: bool,
+    pub looping: bool,
+    /// Playback speed (1 = normal, negative plays backwards).
+    pub speed: f32,
+    /// Default crossfade time in seconds when switching clips.
+    pub crossfade: f32,
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum Component {
     Transform(Transform),
@@ -385,10 +408,12 @@ pub enum Component {
     AudioSource(AudioSource),
     Script(Script),
     Light(Light),
+    Skeleton(Skeleton),
+    AnimationPlayer(AnimationPlayer),
 }
 
 /// Every component type, in inspector order.
-pub const COMPONENT_TYPES: [&str; 10] = [
+pub const COMPONENT_TYPES: [&str; 12] = [
     "Transform",
     "Camera",
     "Camera2D",
@@ -399,6 +424,8 @@ pub const COMPONENT_TYPES: [&str; 10] = [
     "AudioSource",
     "Script",
     "Light",
+    "Skeleton",
+    "AnimationPlayer",
 ];
 
 pub const PRIMITIVE_MESHES: [&str; 6] = ["cube", "sphere", "plane", "quad", "cylinder", "capsule"];
@@ -428,6 +455,8 @@ impl Component {
             Component::AudioSource(_) => "AudioSource",
             Component::Script(_) => "Script",
             Component::Light(_) => "Light",
+            Component::Skeleton(_) => "Skeleton",
+            Component::AnimationPlayer(_) => "AnimationPlayer",
         }
     }
 
@@ -472,6 +501,14 @@ impl Component {
             }),
             "Script" => Component::Script(Script { path: String::new(), enabled: true }),
             "Light" => Component::Light(Light { color: Color::WHITE, intensity: 1.0 }),
+            "Skeleton" => Component::Skeleton(Skeleton { skin: 0, show_bones: false }),
+            "AnimationPlayer" => Component::AnimationPlayer(AnimationPlayer {
+                clip: String::new(),
+                autoplay: true,
+                looping: true,
+                speed: 1.0,
+                crossfade: 0.2,
+            }),
             _ => return None,
         })
     }
@@ -532,6 +569,14 @@ impl Component {
             ],
             Component::Script(s) => vec![("path", F::Text(s.path.clone())), ("enabled", F::Bool(s.enabled))],
             Component::Light(l) => vec![("color", F::Color(l.color)), ("intensity", F::Float(l.intensity))],
+            Component::Skeleton(k) => vec![("skin", F::Float(k.skin as f32)), ("show_bones", F::Bool(k.show_bones))],
+            Component::AnimationPlayer(a) => vec![
+                ("clip", F::Text(a.clip.clone())),
+                ("autoplay", F::Bool(a.autoplay)),
+                ("looping", F::Bool(a.looping)),
+                ("speed", F::Float(a.speed)),
+                ("crossfade", F::Float(a.crossfade)),
+            ],
         }
     }
 
@@ -717,6 +762,25 @@ impl Component {
                     f.max(0.0)
                 }
             }
+            (Component::Skeleton(k), "skin") => k.skin = fnum?.max(0.0) as u32,
+            (Component::Skeleton(k), "show_bones") => match v {
+                F::Bool(b) => k.show_bones = b,
+                _ => return bad(),
+            },
+            (Component::AnimationPlayer(a), "clip") => match v {
+                F::Text(c) => a.clip = c,
+                _ => return bad(),
+            },
+            (Component::AnimationPlayer(a), "autoplay") => match v {
+                F::Bool(b) => a.autoplay = b,
+                _ => return bad(),
+            },
+            (Component::AnimationPlayer(a), "looping") => match v {
+                F::Bool(b) => a.looping = b,
+                _ => return bad(),
+            },
+            (Component::AnimationPlayer(a), "speed") => a.speed = fnum?.clamp(-10.0, 10.0),
+            (Component::AnimationPlayer(a), "crossfade") => a.crossfade = fnum?.clamp(0.0, 5.0),
             (_, _) => return Err(format!("{} has no property '{}'", type_name, name)),
         }
         Ok(())
@@ -765,6 +829,13 @@ impl Component {
                 .with("autoplay", a.autoplay),
             Component::Script(s) => base.with("path", s.path.as_str()).with("enabled", s.enabled),
             Component::Light(l) => base.with("color", l.color.to_hex()).with("intensity", l.intensity),
+            Component::Skeleton(k) => base.with("skin", k.skin as u64).with("show_bones", k.show_bones),
+            Component::AnimationPlayer(a) => base
+                .with("clip", a.clip.as_str())
+                .with("autoplay", a.autoplay)
+                .with("looping", a.looping)
+                .with("speed", a.speed)
+                .with("crossfade", a.crossfade),
         }
     }
 
@@ -963,6 +1034,31 @@ impl Component {
                 }
                 if let Some(v) = f32_of("intensity")? {
                     l.intensity = v;
+                }
+            }
+            Component::Skeleton(k) => {
+                if let Some(v) = f32_of("skin")? {
+                    k.skin = v.max(0.0) as u32;
+                }
+                if let Some(v) = bool_of("show_bones")? {
+                    k.show_bones = v;
+                }
+            }
+            Component::AnimationPlayer(a) => {
+                if let Some(v) = str_of("clip")? {
+                    a.clip = v;
+                }
+                if let Some(v) = bool_of("autoplay")? {
+                    a.autoplay = v;
+                }
+                if let Some(v) = bool_of("looping")? {
+                    a.looping = v;
+                }
+                if let Some(v) = f32_of("speed")? {
+                    a.speed = v;
+                }
+                if let Some(v) = f32_of("crossfade")? {
+                    a.crossfade = v.max(0.0);
                 }
             }
         }

@@ -1,0 +1,21 @@
+[project]
+name = "Character Demo"
+version = "0.1.0"
+engine = "grodot"
+config_version = 1
+
+[game]
+main_scene = "scenes/main.gscene"
+
+[window]
+width = 1280
+height = 720
+title = "Character Demo - skinned glTF animation"
+
+[input]
+move_forward = "W, Up"
+move_back = "S, Down"
+move_left = "A, Left"
+move_right = "D, Right"
+jump = "Space"
+wave = "E"

@@ -84,6 +84,7 @@ impl Runtime {
 
     fn attach(&mut self, ids: &[EntityId]) {
         for &id in ids {
+            crate::animation::attach(&mut self.world.borrow_mut(), id);
             let (script, autoplay) = {
                 let w = self.world.borrow();
                 let Some(e) = w.scene.entity(id) else { continue };
@@ -252,10 +253,21 @@ impl Runtime {
             self.call(i, "update", vec![Value::Number(dt as f64)]);
         }
         self.run_timers();
+        self.advance_animations(dt);
         self.dispatch_signals();
         self.process_destroys();
         self.process_scene_load();
         self.world.borrow_mut().input.end_frame();
+    }
+
+    /// Advance clips and call `on_animation_finished(clip)` for clips that ended.
+    fn advance_animations(&mut self, dt: f32) {
+        let finished = crate::animation::advance_all(&mut self.world.borrow_mut(), dt);
+        for (id, clip) in finished {
+            if let Some(idx) = self.index_of(id) {
+                self.call(idx, "on_animation_finished", vec![Value::str(&clip)]);
+            }
+        }
     }
 
     fn attach_spawned(&mut self) {
@@ -417,6 +429,8 @@ impl Runtime {
             w.forces.clear();
             w.spawned.clear();
             w.pending_destroy.clear();
+            w.animations.clear();
+            w.poses.clear();
         }
         self.timers.borrow_mut().list.clear();
         self.accumulator = 0.0;

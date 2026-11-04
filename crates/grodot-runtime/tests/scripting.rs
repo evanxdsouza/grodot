@@ -366,3 +366,58 @@ end
     assert!((mr.material.uv_offset.y - 0.5).abs() < 1e-4);
     assert_eq!(mr.material.uv_scale, grodot_core::math::Vec2::new(4.0, 2.0));
 }
+
+#[test]
+fn animation_player_api_from_scripts() {
+    let p = TempProject::new("anim");
+    std::fs::create_dir_all(p.root.join("assets/models")).unwrap();
+    let hero = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../examples/character-demo/assets/models/hero.glb");
+    std::fs::copy(hero, p.root.join("assets/models/hero.glb")).unwrap();
+    p.write(
+        "scripts/a.gro",
+        r#"class A < Entity
+  function ready()
+    @clips = self.animation.clips().length()
+    @has_run = self.animation.has_clip?("run")
+    self.animation.play("wave", 0, false)
+    @finished = nil
+  end
+  function update(delta)
+    @clip = self.animation.current_clip
+    @playing = self.animation.playing?()
+  end
+  function on_animation_finished(clip)
+    @finished = clip
+  end
+end
+"#,
+    );
+    p.write(
+        "scripts/bad.gro",
+        "class Bad < Entity\n  function ready()\n\n    self.animation.play(\"moonwalk\")\n  end\nend\n",
+    );
+    let mut scene = scene_with_scripts(&[("A", "scripts/a.gro"), ("Bad", "scripts/bad.gro")]);
+    for e in scene.entities.iter_mut() {
+        let mut mr = Component::new_default("MeshRenderer").unwrap();
+        mr.set_field("mesh", FieldValue::Text("assets/models/hero.glb".into())).unwrap();
+        e.add(mr);
+        let mut ap = Component::new_default("AnimationPlayer").unwrap();
+        ap.set_field("autoplay", FieldValue::Bool(false)).unwrap();
+        e.add(ap);
+    }
+    let mut rt = Runtime::new(scene, Some(p.root.clone()), Default::default());
+    rt.frame(0.1);
+    assert!(matches!(field(&rt, "A", "clips"), Value::Number(n) if n == 4.0));
+    assert!(matches!(field(&rt, "A", "has_run"), Value::Bool(true)));
+    assert!(matches!(field(&rt, "A", "clip"), Value::Str(s) if &*s == "wave"));
+    assert!(matches!(field(&rt, "A", "playing"), Value::Bool(true)));
+    for _ in 0..20 {
+        rt.frame(0.1); // wave is 1.2 s
+    }
+    assert!(matches!(field(&rt, "A", "finished"), Value::Str(s) if &*s == "wave"));
+    assert!(matches!(field(&rt, "A", "playing"), Value::Bool(false)));
+    let errs = errors(&rt);
+    assert_eq!(errs.len(), 1, "{:?}", errs);
+    assert!(errs[0].contains("no animation clip named 'moonwalk'") && errs[0].contains("run"), "{}", errs[0]);
+    assert!(errs[0].contains("File: scripts/bad.gro") && errs[0].contains("Line: 4"), "{}", errs[0]);
+}

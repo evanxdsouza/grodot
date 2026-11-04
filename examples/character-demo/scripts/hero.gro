@@ -1,0 +1,48 @@
+# A skinned glTF hero: WASD / arrows to run, Space to jump, E to wave.
+# Picks idle / run / jump / wave clips on the AnimationPlayer; clips
+# crossfade over the AnimationPlayer's crossfade time (0.2 s).
+class Hero < Entity
+  SPEED = 4.5
+  JUMP_SPEED = 6.5
+
+  function ready()
+    @busy = false   # true while a one-shot clip (jump, wave) plays
+  end
+
+  function update(delta)
+    direction = Vector3.new(Input.axis("move_left", "move_right"), 0, Input.axis("move_forward", "move_back"))
+    moving = direction.length() > 0
+    if moving
+      direction = direction.normalized()
+      self.look_at(self.position + direction)
+    end
+    self.velocity = Vector3.new(direction.x * SPEED, self.velocity.y, direction.z * SPEED)
+
+    if Input.just_pressed("jump") and self.on_floor?()
+      self.velocity = self.velocity.with_y(JUMP_SPEED)
+      self.animation.play("jump", 0.1, false)   # one-shot: no loop
+      Audio.play("assets/audio/jump.wav", 0.6)
+      @busy = true
+    elsif Input.just_pressed("wave") and not moving and not @busy
+      self.animation.play("wave", 0.2, false)
+      @busy = true
+    end
+
+    if not @busy
+      if moving
+        self.animation.play("run")
+      else
+        self.animation.play("idle")
+      end
+    elsif moving and self.animation.current_clip == "wave"
+      @busy = false   # running cancels the wave
+    end
+
+    UI.text("Clip: #{self.animation.current_clip}")
+  end
+
+  # Called when a non-looping clip reaches its end.
+  function on_animation_finished(clip)
+    @busy = false
+  end
+end

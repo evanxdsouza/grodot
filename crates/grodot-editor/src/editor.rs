@@ -785,7 +785,8 @@ impl Editor {
             let w = rt.world.borrow();
             let view = SceneRenderer::camera_view(&w.scene, vp).unwrap_or_else(|| self.camera.view(vp));
             let opts = RenderOptions { show_colliders: self.show_colliders, ..Default::default() };
-            self.renderer.render(&mut self.ui.canvas, vp, &w.scene, &view, &opts);
+            let extras = grodot_render::scene_render::RenderExtras { poses: Some(&w.poses) };
+            self.renderer.render_ex(&mut self.ui.canvas, vp, &w.scene, &view, &opts, &extras);
             hud::draw_debug_lines(&mut self.ui.canvas, vp, &view, &w);
             hud::draw_hud(&mut self.ui.canvas, vp, &w);
             if SceneRenderer::camera_view(&w.scene, vp).is_none() {
@@ -1224,14 +1225,36 @@ impl Editor {
                         let mut s = t.clone();
                         let pick = matches!(
                             (cname.as_str(), fname),
-                            ("MeshRenderer", "mesh" | "texture") | ("AudioSource", "clip") | ("Script", "path")
+                            ("MeshRenderer", "mesh" | "texture")
+                                | ("AudioSource", "clip")
+                                | ("Script", "path")
+                                | ("AnimationPlayer", "clip")
                         );
                         let tw = if pick { wr.w - 30 } else { wr.w };
                         if self.ui.text_field(fid("t"), Rect::new(wr.x, wr.y, tw, 24), &mut s) {
                             new_value = Some(FieldValue::Text(s.trim().to_string()));
                         }
                         if pick && self.ui.button(Rect::new(wr.right() - 26, wr.y, 26, 24), "...") {
-                            let options = asset_options(&self.assets, &cname, fname);
+                            let options = if cname == "AnimationPlayer" {
+                                let mesh = scene
+                                    .entity(sel)
+                                    .and_then(|e| e.mesh())
+                                    .map(|m| m.mesh.clone())
+                                    .unwrap_or_default();
+                                let mut clips: Vec<String> = Vec::new();
+                                if grodot_core::gltf::is_model_path(&mesh) {
+                                    if let Some(m) = self.renderer.model(&mesh) {
+                                        clips = m.gltf.animations.iter().map(|a| a.name.clone()).collect();
+                                    }
+                                }
+                                if clips.is_empty() {
+                                    self.status =
+                                        Some(("This entity's MeshRenderer model has no animation clips".into(), 3.0));
+                                }
+                                clips
+                            } else {
+                                asset_options(&self.assets, &cname, fname)
+                            };
                             self.popup =
                                 Popup::AssetPicker { component: cname.clone(), field: fname.to_string(), options };
                             self.popup_pos = (wr.x - 60, wr.bottom());

@@ -98,3 +98,10 @@ fn gltf_village_matches_golden_image() {
     let canvas = render_example("gltf-demo", 30, 640, 360);
     check_golden("gltf-demo", &canvas);
 }
+
+#[test]
+fn skinned_character_matches_golden_image() {
+    // 40 frames into the idle clip: the CUBICSPLINE breathing and arm sway are mid-cycle.
+    let canvas = render_example("character-demo", 40, 640, 360);
+    check_golden("character-demo", &canvas);
+}

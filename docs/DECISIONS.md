@@ -91,3 +91,24 @@ records a snapshot when an edit finishes (not during a drag). 100 levels.
 
 **D10. Scripts are edited in the user's own editor.** The Script inspector and
 the console open files with `$VISUAL` (with `+line`) or `xdg-open`.
+
+## Rendering and assets
+
+**D11. glTF skinning runs on the CPU.** Each frame, an entity with a Skeleton
+gets its mesh skinned into a scratch vertex buffer (linear blend skinning, up
+to 4 joint influences per vertex) before rasterization. Joint matrices are
+`joint world × inverse bind`, computed once per entity per frame.
+
+Performance notes:
+
+* The cost is about 4 matrix-vector products per vertex, for positions and
+  normals. The demo hero has 336 vertices, so skinning is a few microseconds,
+  far below rasterization cost.
+* The skinned buffer is rebuilt every frame and is not cached between frames,
+  even when the pose has not changed.
+* Characters of around 10k vertices are still cheap next to raster time. GPU
+  skinning would only pay off together with a GPU rasterizer.
+
+Animation sampling supports LINEAR (with slerp for rotations), STEP and
+CUBICSPLINE. Crossfades blend the outgoing pose into the new clip; the default
+is 0.2 s.

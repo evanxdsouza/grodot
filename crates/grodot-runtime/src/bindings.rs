@@ -182,7 +182,7 @@ impl HostObject for EntityHandle {
     }
 
     fn get_property(&self, name: &str) -> Option<GroResult<Value>> {
-        const PROPS: [&str; 13] = [
+        const PROPS: [&str; 14] = [
             "id",
             "name",
             "tag",
@@ -196,6 +196,7 @@ impl HostObject for EntityHandle {
             "color",
             "visible",
             "material",
+            "animation",
         ];
         if !PROPS.contains(&name) {
             return None;
@@ -236,6 +237,10 @@ impl HostObject for EntityHandle {
                 Some(_) => Ok(Value::Host(Rc::new(ComponentRef::material(self.id, &self.world)))),
                 None => engine_err(format!("entity '{}' has no MeshRenderer, so it has no material", e.name)),
             },
+            "animation" => match e.has("AnimationPlayer") {
+                true => Ok(Value::Host(Rc::new(ComponentRef::new(self.id, "AnimationPlayer", &self.world)))),
+                false => engine_err(format!("entity '{}' has no AnimationPlayer component", e.name)),
+            },
             _ => unreachable!(),
         })
     }
@@ -254,7 +259,7 @@ impl HostObject for EntityHandle {
             "visible",
         ];
         if !PROPS.contains(&name) {
-            if name == "id" || name == "parent" || name == "material" {
+            if name == "id" || name == "parent" || name == "material" || name == "animation" {
                 return Some(engine_err(format!("entity.{} is read-only", name)));
             }
             return None;
@@ -657,6 +662,87 @@ impl ComponentRef {
         }
     }
 
+    /// Run `f` on this entity's animation state.
+    fn with_anim<R>(&self, f: impl FnOnce(&mut crate::animation::AnimState) -> GroResult<R>) -> GroResult<R> {
+        let mut w = self.world.borrow_mut();
+        let name = w.scene.entity(self.entity).map(|e| e.name.clone()).unwrap_or_default();
+        match w.animations.get_mut(&self.entity) {
+            Some(st) => f(st),
+            None => engine_err(format!(
+                "'{}' has no animation to control (its MeshRenderer must show a .glb/.gltf model with animation clips)",
+                name
+            )),
+        }
+    }
+
+    fn animation_method(&self, name: &str, args: &[Value]) -> Option<GroResult<Value>> {
+        let (looping, speed, crossfade) = {
+            let w = self.world.borrow();
+            match w.scene.entity(self.entity).and_then(|e| e.get("AnimationPlayer")) {
+                Some(Component::AnimationPlayer(a)) => (a.looping, a.speed, a.crossfade),
+                _ => return Some(Err(self.missing())),
+            }
+        };
+        Some(match name {
+            "play" => (|| {
+                let clip = match args.first() {
+                    Some(Value::Str(s)) | Some(Value::Symbol(s)) => s.to_string(),
+                    _ => return engine_err("play() needs a clip name, e.g. animation.play(\"run\")"),
+                };
+                let fade = match args.get(1) {
+                    None | Some(Value::Nil) => crossfade,
+                    Some(Value::Number(n)) => (*n as f32).max(0.0),
+                    Some(other) => {
+                        return Err(GroError::new(
+                            ErrorKind::Type,
+                            format!("play() crossfade must be a Number of seconds, got {}", other.type_name()),
+                        ))
+                    }
+                };
+                let looping = match args.get(2) {
+                    None | Some(Value::Nil) => looping,
+                    Some(Value::Bool(b)) => *b,
+                    Some(other) => {
+                        return Err(GroError::new(
+                            ErrorKind::Type,
+                            format!("play() loop flag must be true or false, got {}", other.type_name()),
+                        ))
+                    }
+                };
+                self.with_anim(|st| match st.gltf.animation_index(&clip) {
+                    Some(i) => {
+                        st.play(i, fade, looping, speed);
+                        Ok(Value::Bool(true))
+                    }
+                    None => engine_err(format!(
+                        "no animation clip named '{}' (this model has: {})",
+                        clip,
+                        if st.gltf.animations.is_empty() { "no clips".to_string() } else { st.clip_names().join(", ") }
+                    )),
+                })
+            })(),
+            "stop" => self.with_anim(|st| {
+                st.stop();
+                Ok(Value::Nil)
+            }),
+            "pause" => self.with_anim(|st| {
+                st.playing = false;
+                Ok(Value::Nil)
+            }),
+            "resume" => self.with_anim(|st| {
+                st.playing = st.clip.is_some();
+                Ok(Value::Nil)
+            }),
+            "playing?" => self.with_anim(|st| Ok(Value::Bool(st.playing))),
+            "clips" => self.with_anim(|st| Ok(Value::array(st.clip_names().iter().map(|c| Value::str(c)).collect()))),
+            "has_clip?" => {
+                let n = args.first().map(|v| v.to_display()).unwrap_or_default();
+                self.with_anim(|st| Ok(Value::Bool(st.gltf.animation_index(&n).is_some())))
+            }
+            _ => return None,
+        })
+    }
+
     fn visible_field(&self, name: &str) -> bool {
         self.only.map(|o| o.contains(&name)).unwrap_or(true)
     }
@@ -708,6 +794,15 @@ impl HostObject for ComponentRef {
         if name == "entity" {
             return Some(Ok(entity_value(&self.world, self.entity)));
         }
+        if self.type_name == "AnimationPlayer" && matches!(name, "current_clip" | "time" | "length") {
+            return Some(self.with_anim(|st| {
+                Ok(match name {
+                    "current_clip" => st.clip_name().map(Value::str).unwrap_or(Value::Nil),
+                    "time" => Value::Number(st.time as f64),
+                    _ => Value::Number(st.duration() as f64),
+                })
+            }));
+        }
         let w = self.world.borrow();
         let comp = match w.scene.entity(self.entity).and_then(|e| e.get(&self.type_name)) {
             Some(c) => c,
@@ -729,6 +824,41 @@ impl HostObject for ComponentRef {
         if !self.visible_field(name) {
             return None;
         }
+        if self.type_name == "AnimationPlayer" {
+            match name {
+                "time" => {
+                    let t = match value {
+                        Value::Number(n) => n as f32,
+                        other => {
+                            return Some(Err(GroError::new(
+                                ErrorKind::Type,
+                                format!("animation.time must be a Number, got {}", other.type_name()),
+                            )))
+                        }
+                    };
+                    return Some(self.with_anim(|st| {
+                        st.time = t.clamp(0.0, st.duration());
+                        Ok(())
+                    }));
+                }
+                "current_clip" | "length" => {
+                    return Some(engine_err(format!("animation.{} is read-only; use play(\"name\")", name)))
+                }
+                // Changing speed or looping also affects the clip that is playing now.
+                "speed" | "looping" => {
+                    let v = value.clone();
+                    let _ = self.with_anim(|st| {
+                        match (name, &v) {
+                            ("speed", Value::Number(n)) => st.speed = *n as f32,
+                            ("looping", b) => st.looping = b.truthy(),
+                            _ => {}
+                        }
+                        Ok(())
+                    });
+                }
+                _ => {}
+            }
+        }
         if name == "texture" {
             if let Err(e) = self.check_texture(&value) {
                 return Some(Err(e));
@@ -746,7 +876,12 @@ impl HostObject for ComponentRef {
         )
     }
 
-    fn call_method(&self, _interp: &mut Interpreter, name: &str, _args: &[Value]) -> Option<GroResult<Value>> {
+    fn call_method(&self, _interp: &mut Interpreter, name: &str, args: &[Value]) -> Option<GroResult<Value>> {
+        if self.type_name == "AnimationPlayer" {
+            if let Some(r) = self.animation_method(name, args) {
+                return Some(r);
+            }
+        }
         match name {
             "fields" => {
                 let w = self.world.borrow();

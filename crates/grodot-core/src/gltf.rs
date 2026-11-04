@@ -113,6 +113,58 @@ pub struct Gltf {
     pub images: Vec<Option<Image>>,
     /// Non-fatal problems (unsupported image formats, ignored extensions).
     pub warnings: Vec<String>,
+    pub skins: Vec<Skin>,
+    pub animations: Vec<Animation>,
+}
+
+/// A skin: which nodes act as joints and how each joint maps from bind pose.
+#[derive(Debug, Clone)]
+pub struct Skin {
+    pub name: String,
+    /// Node index of each joint (JOINTS_0 values index into this list).
+    pub joints: Vec<usize>,
+    /// One per joint (identity when the file has none).
+    pub inverse_bind: Vec<Mat4>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AnimPath {
+    Translation,
+    Rotation,
+    Scale,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Interpolation {
+    Linear,
+    Step,
+    CubicSpline,
+}
+
+/// Keyframes for one node property. For CUBICSPLINE, `values` holds
+/// (in-tangent, value, out-tangent) per key, as in the glTF file.
+#[derive(Debug, Clone)]
+pub struct Channel {
+    pub node: usize,
+    pub path: AnimPath,
+    pub interpolation: Interpolation,
+    pub times: Vec<f32>,
+    /// Flattened components: 3 per key (translation/scale) or 4 (rotation x, y, z, w).
+    pub values: Vec<f32>,
+}
+
+#[derive(Debug, Clone)]
+pub struct Animation {
+    pub name: String,
+    pub channels: Vec<Channel>,
+    /// Length in seconds (the last keyframe time of any channel).
+    pub duration: f32,
+}
+
+impl Gltf {
+    pub fn animation_index(&self, name: &str) -> Option<usize> {
+        self.animations.iter().position(|a| a.name == name)
+    }
 }
 
 /// A mesh primitive placed in the model's space (all node transforms applied).
@@ -555,7 +607,98 @@ impl<'a> Loader<'a> {
                 }
             }
         }
-        Ok(Gltf { meshes, nodes, roots, materials, images, warnings })
+        let skins = self.skins(&nodes)?;
+        let animations = self.animations(nodes.len(), &mut warnings)?;
+        Ok(Gltf { meshes, nodes, roots, materials, images, warnings, skins, animations })
+    }
+
+    fn skins(&self, nodes: &[Node]) -> Result<Vec<Skin>, GltfError> {
+        let mut out = Vec::new();
+        for (si, s) in arr(self.doc, "skins").iter().enumerate() {
+            let joints: Vec<usize> = arr(s, "joints").iter().filter_map(|j| j.as_f64()).map(|j| j as usize).collect();
+            if joints.iter().any(|&j| j >= nodes.len()) {
+                return bad(format!("skin {} refers to a missing joint node", si));
+            }
+            let inverse_bind = match idx(s, "inverseBindMatrices") {
+                Some(a) => {
+                    let (v, comps) = self.accessor_f32(a)?;
+                    if comps != 16 || v.len() / 16 < joints.len() {
+                        return bad(format!("skin {} inverseBindMatrices must hold one MAT4 per joint", si));
+                    }
+                    v.chunks_exact(16)
+                        .take(joints.len())
+                        .map(|m| {
+                            let mut mat = Mat4::IDENTITY;
+                            for c in 0..4 {
+                                for r in 0..4 {
+                                    mat.c[c][r] = m[c * 4 + r];
+                                }
+                            }
+                            mat
+                        })
+                        .collect()
+                }
+                None => vec![Mat4::IDENTITY; joints.len()],
+            };
+            out.push(Skin {
+                name: s.get("name").and_then(|v| v.as_str()).unwrap_or("").to_string(),
+                joints,
+                inverse_bind,
+            });
+        }
+        Ok(out)
+    }
+
+    fn animations(&self, node_count: usize, warnings: &mut Vec<String>) -> Result<Vec<Animation>, GltfError> {
+        let mut out = Vec::new();
+        for (ai, a) in arr(self.doc, "animations").iter().enumerate() {
+            let name =
+                a.get("name").and_then(|v| v.as_str()).map(|s| s.to_string()).unwrap_or(format!("animation_{}", ai));
+            let samplers = arr(a, "samplers");
+            let mut channels = Vec::new();
+            let mut duration = 0.0f32;
+            for c in arr(a, "channels") {
+                let Some(target) = c.get("target") else { continue };
+                let Some(node) = idx(target, "node") else { continue };
+                if node >= node_count {
+                    return bad(format!("animation '{}' targets a missing node", name));
+                }
+                let path = match target.get("path").and_then(|v| v.as_str()).unwrap_or("") {
+                    "translation" => AnimPath::Translation,
+                    "rotation" => AnimPath::Rotation,
+                    "scale" => AnimPath::Scale,
+                    "weights" => {
+                        warnings.push(format!("animation '{}': morph target weights are not supported", name));
+                        continue;
+                    }
+                    p => return bad(format!("animation '{}' has unknown target path '{}'", name, p)),
+                };
+                let samp = idx(c, "sampler")
+                    .and_then(|i| samplers.get(i))
+                    .ok_or_else(|| GltfError(format!("animation '{}' channel refers to a missing sampler", name)))?;
+                let interpolation = match samp.get("interpolation").and_then(|v| v.as_str()).unwrap_or("LINEAR") {
+                    "STEP" => Interpolation::Step,
+                    "CUBICSPLINE" => Interpolation::CubicSpline,
+                    _ => Interpolation::Linear,
+                };
+                let (times, _) =
+                    self.accessor_f32(idx(samp, "input").ok_or_else(|| GltfError("sampler without input".into()))?)?;
+                let (values, comps) =
+                    self.accessor_f32(idx(samp, "output").ok_or_else(|| GltfError("sampler without output".into()))?)?;
+                let want = if path == AnimPath::Rotation { 4 } else { 3 };
+                let per_key = if interpolation == Interpolation::CubicSpline { 3 } else { 1 };
+                if comps != want || values.len() != times.len() * want * per_key {
+                    return bad(format!("animation '{}': keyframe count does not match its times", name));
+                }
+                if times.windows(2).any(|w| w[1] < w[0]) {
+                    return bad(format!("animation '{}': keyframe times must increase", name));
+                }
+                duration = duration.max(times.last().copied().unwrap_or(0.0));
+                channels.push(Channel { node, path, interpolation, times, values });
+            }
+            out.push(Animation { name, channels, duration });
+        }
+        Ok(out)
     }
 
     fn buffer_view(&self, i: usize) -> Result<&[u8], GltfError> {
@@ -704,6 +847,25 @@ impl<'a> Loader<'a> {
             mesh.normals = vec![Vec3::ZERO; n];
         }
         mesh.ensure_uvs();
+        if let (Some(ji), Some(wi)) = (idx(attrs, "JOINTS_0"), idx(attrs, "WEIGHTS_0")) {
+            let (j, jc) = self.accessor_f32(ji)?;
+            let (w, wc) = self.accessor_f32(wi)?;
+            if jc != 4 || wc != 4 || j.len() != n * 4 || w.len() != n * 4 {
+                return bad("JOINTS_0 and WEIGHTS_0 must be VEC4 with one entry per vertex");
+            }
+            mesh.joints = j.chunks_exact(4).map(|c| [c[0] as u16, c[1] as u16, c[2] as u16, c[3] as u16]).collect();
+            mesh.weights = w
+                .chunks_exact(4)
+                .map(|c| {
+                    let sum: f32 = c.iter().sum();
+                    if sum > 1e-6 {
+                        [c[0] / sum, c[1] / sum, c[2] / sum, c[3] / sum]
+                    } else {
+                        [1.0, 0.0, 0.0, 0.0]
+                    }
+                })
+                .collect();
+        }
         let raw: Vec<u32> = match idx(p, "indices") {
             Some(i) => self.accessor_indices(i)?,
             None => (0..n as u32).collect(),
@@ -757,6 +919,10 @@ impl<'a> Loader<'a> {
                     flat.positions.push(mesh.positions[i as usize]);
                     flat.normals.push(nrm);
                     flat.uvs.push(mesh.uvs[i as usize]);
+                    if !mesh.joints.is_empty() {
+                        flat.joints.push(mesh.joints[i as usize]);
+                        flat.weights.push(mesh.weights[i as usize]);
+                    }
                     flat.indices.push(flat.positions.len() as u32 - 1);
                 }
             }

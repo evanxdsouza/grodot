@@ -21,6 +21,13 @@ pub fn is_texture_path(p: &str) -> bool {
 
 type SpritePick = (i32, usize, EntityId, Vec<(f32, f32)>);
 
+/// Per-frame data from the runtime that is not part of the saved scene.
+#[derive(Default)]
+pub struct RenderExtras<'a> {
+    /// Animated node-local matrices of each entity's glTF model.
+    pub poses: Option<&'a HashMap<EntityId, Vec<Mat4>>>,
+}
+
 #[derive(Debug, Clone, Default)]
 pub struct RenderOptions {
     pub grid: bool,
@@ -301,7 +308,26 @@ impl SceneRenderer {
     }
 
     pub fn render(&mut self, canvas: &mut Canvas, viewport: Rect, scene: &Scene, view: &View, opts: &RenderOptions) {
+        self.render_ex(canvas, viewport, scene, view, opts, &RenderExtras::default())
+    }
+
+    /// Render with runtime extras (animation poses).
+    ///
+    /// Skinned meshes are deformed on the CPU into a scratch mesh every frame:
+    /// cost is roughly (vertices x influences) matrix multiplies per skinned
+    /// model, which is small next to rasterization for game-jam characters
+    /// (a 1-2k vertex character skins in well under a millisecond).
+    pub fn render_ex(
+        &mut self,
+        canvas: &mut Canvas,
+        viewport: Rect,
+        scene: &Scene,
+        view: &View,
+        opts: &RenderOptions,
+        extras: &RenderExtras,
+    ) {
         Self::draw_background(canvas, viewport, scene.environment.background);
+        let mut bones: Vec<(Vec3, Vec3)> = Vec::new();
         let light = Self::lighting(scene, view);
         let mut meshes: Vec<(Rc<Mesh>, Mat4, RMaterial)> = Vec::new();
         let mut line_parts: Vec<(Rc<Mesh>, Mat4, RMaterial)> = Vec::new();
@@ -314,14 +340,48 @@ impl SceneRenderer {
             let mat = self.material(&mr.material, mr.lit);
             if grodot_core::gltf::is_model_path(&mr.mesh) {
                 if let Some(model) = self.model(&mr.mesh) {
-                    let nodes = model.gltf.node_world_matrices();
+                    let pose = extras.poses.and_then(|p| p.get(&e.id));
+                    let nodes = match pose {
+                        Some(locals) if locals.len() == model.gltf.nodes.len() => model.gltf.world_from_locals(locals),
+                        _ => model.gltf.node_world_matrices(),
+                    };
+                    let skeleton = match e.get("Skeleton") {
+                        Some(Component::Skeleton(k)) => Some(k.clone()),
+                        _ => None,
+                    };
+                    let skin_joints = skeleton.as_ref().and_then(|k| {
+                        let skin = k.skin as usize;
+                        (skin < model.gltf.skins.len())
+                            .then(|| grodot_core::animation::joint_matrices(&model.gltf, skin, &nodes))
+                    });
                     for part in &model.parts {
                         let m = combine_materials(&part.material, &mat, mr.material.texture.is_some());
-                        let w = world * nodes[part.node];
+                        let skinned = !part.mesh.joints.is_empty() && model.gltf.nodes[part.node].skin.is_some();
                         if part.lines {
-                            line_parts.push((part.mesh.clone(), w, m));
+                            line_parts.push((part.mesh.clone(), world * nodes[part.node], m));
+                        } else if skinned {
+                            // Skinned vertices live in model space; the mesh node's own transform is ignored (glTF rule).
+                            match &skin_joints {
+                                Some(j) => {
+                                    meshes.push((Rc::new(grodot_core::animation::skin_mesh(&part.mesh, j)), world, m))
+                                }
+                                None => meshes.push((part.mesh.clone(), world, m)),
+                            }
                         } else {
-                            meshes.push((part.mesh.clone(), w, m));
+                            meshes.push((part.mesh.clone(), world * nodes[part.node], m));
+                        }
+                    }
+                    if let (Some(k), true) = (&skeleton, skeleton.as_ref().map(|k| k.show_bones).unwrap_or(false)) {
+                        if let Some(skin) = model.gltf.skins.get(k.skin as usize) {
+                            for &j in &skin.joints {
+                                let parent = model.gltf.nodes.iter().position(|n| n.children.contains(&j));
+                                if let Some(p) = parent.filter(|p| skin.joints.contains(p)) {
+                                    bones.push((
+                                        (world * nodes[p]).get_translation(),
+                                        (world * nodes[j]).get_translation(),
+                                    ));
+                                }
+                            }
                         }
                     }
                 }
@@ -376,6 +436,9 @@ impl SceneRenderer {
         // Shadows are drawn as darkened unlit discs blended by depth test.
         for (model, strength) in &shadows {
             draw_shadow(canvas, viewport, view, &disc, *model, *strength);
+        }
+        for (a, b) in &bones {
+            raster::draw_line_3d(canvas, viewport, view, *a, *b, 0xffe040, false);
         }
         if opts.grid {
             draw_grid(canvas, viewport, view);

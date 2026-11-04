@@ -247,6 +247,12 @@ pub struct World {
     pub forces: HashMap<EntityId, Vec3>,
     /// Script objects attached to entities (for `other.health` style access).
     pub script_objects: HashMap<EntityId, groscript::Value>,
+    /// glTF models loaded for animation (cached by path).
+    pub models: HashMap<String, Result<std::rc::Rc<grodot_core::gltf::Gltf>, String>>,
+    /// Animation playback state per entity.
+    pub animations: HashMap<EntityId, crate::animation::AnimState>,
+    /// Current node-local matrices of each animated entity's model (for rendering).
+    pub poses: HashMap<EntityId, Vec<grodot_core::math::Mat4>>,
     /// Scene file this world was loaded from (for Scene.reload()).
     pub scene_path: Option<String>,
 }
@@ -273,6 +279,9 @@ impl World {
             signal_events: VecDeque::new(),
             forces: HashMap::new(),
             script_objects: HashMap::new(),
+            models: HashMap::new(),
+            animations: HashMap::new(),
+            poses: HashMap::new(),
             scene_path: None,
         }
     }
