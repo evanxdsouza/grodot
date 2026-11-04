@@ -26,13 +26,14 @@
 
 ## Deferred (in cut order)
 
-* Textures and UV mapping in the rasterizer, including texture-backed sprites.
-* 2D physics bodies, collision shapes, and tile maps.
+* Texture-backed 2D sprites and 2D physics bodies, collision shapes, and tile maps.
 * GDScript signal declarations, full NodePath features (unique names and exported paths), and syntax such as annotations and typed declarations (`enum` and basic `match` are done; see `docs/PARITY.md`).
-* glTF 2.0 model import (OBJ and primitives work today).
+* Point and spot light shadows; per-pixel lighting only on the main pass (per-vertex mode exists, see `docs/DECISIONS.md`).
+* Additive particle blending, particle collisions, and sub-emitters.
+* Retained UI controls (Control trees, layout containers, text fields).
+* Tweens and animation state machines.
 * Rotate and scale gizmos, multi-select, copy/paste between scenes.
-* Gamepad input.
-* Script hot reload while playing.
+* Gamepad rumble, and gamepad button remapping beyond the standard layout.
 * Spatial audio, OGG decoding, a mixer graph.
 * Applying Play-mode changes back to the editor scene.
 * A GPU renderer behind the same `SceneRenderer` interface.

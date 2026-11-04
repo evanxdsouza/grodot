@@ -315,3 +315,34 @@ A callback that raises an error is reported in the console and that script
 instance is disabled; other scripts keep running. The engine API (entities,
 components, `Input`, `Scene`, `Audio`, `Timer`, `UI`, ...) is documented on the
 docs site.
+
+### 11.1 Rendering and content
+
+* **Textures and materials.** A material has a base colour, an optional
+  `.png`/`.bmp` texture, UV scale and offset, filtering (nearest, bilinear or
+  trilinear mipmapping), wrap mode, and alpha mode (opaque, cutout or blend). UVs
+  are interpolated with perspective correction.
+* **glTF 2.0.** `.glb` and `.gltf` files load with their node hierarchy,
+  materials and textures. Skins and clips play through `Skeleton` and
+  `AnimationPlayer`. Draco and KTX2 are not supported.
+* **Lights.** Directional, point and spot lights. Directional lights can cast
+  shadows (orthographic shadow maps with a 3x3 PCF lookup).
+* **Emissive surfaces** add glow after lighting, optionally modulated by a texture.
+
+### 11.2 Input, particles and UI
+
+* **Gamepads** are read from `/dev/input/js*`. Pad buttons are input keys named
+  `PadA`, `PadStart` and so on, so bindings in `grodot.toml` work for them too.
+* **Particles** are simulated on the CPU and drawn as camera-facing quads.
+* **UI widgets** are immediate-mode: scripts draw them from `update` and get
+  clicks and focus in the same call. Focus and navigation use the arrow keys, the
+  D-pad, Enter and pad A.
+* **Pause** (`Game.pause()`) stops physics, timers, animations and particles
+  while scripts keep running.
+
+### 11.3 Play-mode hot reload
+
+While playing in the editor, a changed script is recompiled and replaces its
+running instances, keeping their fields. A changed scene reloads the scene. A
+changed texture or model is picked up on the next frame. A script with a syntax
+error keeps its previous version running.

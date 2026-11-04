@@ -164,3 +164,49 @@ completely.
 `emissive_texture`. The glow is added after lighting, so emissive surfaces
 stay bright in shadow. glTF `emissiveFactor` and `emissiveTexture` are read
 too.
+
+## Runtime and content
+
+**D16. Particles are simulated on the CPU and drawn as billboarded quads.**
+Each emitter keeps its live particles in world space, so a moving emitter
+leaves a trail. Each draws its quads through the blended pass of the
+rasterizer, which already sorts transparent geometry back to front, so no
+separate depth sort is needed. The emitter's random number generator is seeded
+from its entity id, which keeps output deterministic and golden-image safe.
+The cost is about one blended quad per live particle, plus the sort. The
+`max_particles` cap bounds it (default 128 per emitter). The particle demo has
+not been timed separately; measure with the lighting benchmark's approach
+before relying on a budget. Alpha blending only: additive blending would need a
+new alpha mode in the rasterizer, and was left for later.
+
+**D17. Gamepads use the Linux joystick API, read without a crate.** The device
+is opened non-blocking and read as 8-byte `js_event` records. The pad is
+searched for every 60 frames while none is connected. Buttons feed the same
+key set as the keyboard (`PadA`, `PadDpadUp`, ...), so bindings and
+`Input.just_pressed` need no special case. The left stick is folded into the
+standard movement axes inside `Input.axis`, and the larger of keyboard and
+stick wins, with ties going to the keyboard. Button numbers follow the xpad
+layout, which covers most Xbox-style pads on Linux. A different layout needs a
+remap, which is not built yet.
+
+**D18. Hot reload checks file times, and keeps script state.** The runtime
+compares modification times of the scene, the scripts, and the scene's textures
+and models, at most every 0.5 s of game time. A changed script is compiled
+again and its running instances get fresh objects with the old fields copied
+over, so counters and state survive an edit. A helper module is run again
+first, because the interpreter keeps imported modules, and then every entity
+script reloads. A script that fails to compile keeps its last working version
+running, and the error goes to the console. A changed scene reloads the scene,
+which resets entity state (the saved scene is now different). Polling was
+chosen over OS file watching so it needs no crate and works the same on every
+file system.
+
+**D19. UI is immediate mode, and pause stops the simulation, not the scripts.**
+A widget call returns its result in the same call, so a button can start a
+scene change in the frame it is clicked. The UI keeps only focus between frames
+and the order of buttons from the last frame. Coordinates are pixels in the
+game area, which the host sets each frame. The editor converts the mouse to
+viewport coordinates, so clicks and layout agree. `Game.pause()` stops physics,
+timers, animations and particles, but scripts keep updating so a pause menu can
+run. Gameplay scripts check `Game.paused?()` themselves. A scene change clears
+the pause, so a new level never starts frozen.

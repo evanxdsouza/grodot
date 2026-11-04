@@ -967,12 +967,15 @@ end</code></pre>
     <tr><td>Camera</td><td><code>field_of_view near_clip far_clip active</code></td><td>The first active camera renders the game. Looks along its <code>-Z</code>.</td></tr>
     <tr><td>Camera2D</td><td><code>active zoom pixels_per_unit</code></td><td>Orthographic XY camera. One world unit is 64 pixels at the default scale and zoom.</td></tr>
     <tr><td>Sprite2D</td><td><code>color size visible z_index</code></td><td>Solid-color, alpha-blended rectangle. Transform rotation and scale apply; higher <code>z_index</code> draws on top. Texture assets are planned.</td></tr>
-    <tr><td>MeshRenderer</td><td><code>mesh color lit visible</code></td><td>Mesh: <code>cube</code> (1 m), <code>sphere</code> (1 m across), <code>plane</code> (1 m, faces up), <code>cylinder</code> (1 m), <code>capsule</code> (1 m wide, 2 m tall), or a project <code>.obj</code> path. Unlit meshes ignore lights.</td></tr>
+    <tr><td>MeshRenderer</td><td><code>mesh lit visible cast_shadows</code> and a <code>material</code></td><td>Mesh: <code>cube</code> (1 m), <code>sphere</code> (1 m across), <code>plane</code> (1 m, faces up), <code>quad</code>, <code>cylinder</code> (1 m), <code>capsule</code> (1 m wide, 2 m tall), a project <code>.obj</code> path, or a <code>.glb</code>/<code>.gltf</code> model. Unlit meshes ignore lights. The material has <code>base_color</code>, <code>texture</code> (a <code>.png</code> or <code>.bmp</code> in <code>assets/textures/</code>), <code>uv_scale</code>, <code>uv_offset</code>, <code>filter</code> (<code>nearest</code>, <code>bilinear</code>, <code>trilinear</code>), <code>wrap</code> (<code>repeat</code>, <code>clamp</code>), <code>alpha_mode</code> (<code>opaque</code>, <code>cutout</code>, <code>blend</code>), <code>alpha_cutoff</code>, <code>double_sided</code>, <code>emissive</code> and <code>emissive_texture</code>.</td></tr>
     <tr><td>RigidBody</td><td><code>body_type mass velocity gravity</code></td><td><code>"dynamic"</code>: gravity and collisions. <code>"kinematic"</code>: moves by velocity or script, never pushed. <code>"static"</code>: does not move.</td></tr>
     <tr><td>Collider</td><td><code>shape size radius offset sensor friction restitution</code></td><td><code>"box"</code> (size before scale) or <code>"sphere"</code>. A sensor reports touches but does not block. A Collider without a RigidBody is static.</td></tr>
     <tr><td>AudioSource</td><td><code>clip volume looping autoplay</code></td><td>With <code>autoplay</code>, the clip starts with the scene (looping clips play as music).</td></tr>
     <tr><td>Script</td><td><code>path enabled</code></td><td>The <code>.gro</code> file whose Entity class is attached.</td></tr>
-    <tr><td>Light</td><td><code>color intensity</code></td><td>Directional sunlight shining along the entity's <code>-Z</code>.</td></tr>
+    <tr><td>Light</td><td><code>light_type color intensity range spot_angle shadows</code></td><td><code>"directional"</code> (sunlight along the entity's <code>-Z</code>; casts shadows when <code>shadows</code> is on), <code>"point"</code> (a bulb that fades out at <code>range</code> metres) or <code>"spot"</code> (a cone with a full angle of <code>spot_angle</code> degrees). Up to two shadowed suns per frame.</td></tr>
+    <tr><td>Skeleton</td><td><code>skin show_bones</code></td><td>Makes the entity's glTF model skinned: its joints follow the AnimationPlayer. <code>show_bones</code> draws the joint lines (a debugging aid).</td></tr>
+    <tr><td>AnimationPlayer</td><td><code>clip autoplay looping speed crossfade</code></td><td>Plays the clips in the entity's glTF model. <code>clip</code> is the clip to play at the start (empty means the first clip). <code>crossfade</code> is the default blend time in seconds (0.2).</td></tr>
+    <tr><td>ParticleEmitter</td><td><code>playing rate max_particles lifetime lifetime_random speed spread gravity size_start size_end color_start color_end texture</code></td><td>Emits particles that fly along the entity's up (+Y) direction. <code>spread</code> is the cone's half-angle in degrees. Size and colour change from start to end over each particle's life; alpha is opacity. Without a texture each particle is a plain quad.</td></tr>
   </table></div>
   <p>For a working 2D scene, open <code>examples/2d-starter</code>. It includes a Camera2D, a backdrop, and layered sprites that you can edit in the scene inspector.</p>
 
@@ -986,6 +989,16 @@ end</code></pre>
     <dt>Input.mouse_button_down(button)</dt><dd><code>"left"</code>, <code>"right"</code>, <code>"middle"</code> (or 0, 1, 2).</dd>
   </dl>
   <p>When the window loses focus, all keys are released so nothing gets stuck.</p>
+
+  <h3 id="api-gamepad" data-toc="Gamepad">Gamepad</h3>
+  <p>Gamepads are read from the Linux joystick interface (<code>/dev/input/js0</code> to <code>js7</code>). A pad is found within a second of being plugged in, and its buttons release if it is unplugged.</p>
+  <dl class="api">
+    <dt>Gamepad.connected?() Gamepad.device()</dt><dd>Is a pad connected, and which device file it is.</dd>
+    <dt>Gamepad.down?(button) Gamepad.just_pressed?(button) Gamepad.just_released?(button)</dt><dd>Button state. <code>button</code> is <code>"a"</code>, <code>"b"</code>, <code>"x"</code>, <code>"y"</code>, <code>"lb"</code>, <code>"rb"</code>, <code>"back"</code>, <code>"start"</code>, <code>"guide"</code>, <code>"ls"</code>, <code>"rs"</code>, <code>"dpad_up"</code>, <code>"dpad_down"</code>, <code>"dpad_left"</code> or <code>"dpad_right"</code>.</dd>
+    <dt>Gamepad.axis(name)</dt><dd><code>left_x</code>, <code>left_y</code>, <code>right_x</code>, <code>right_y</code> (-1 to 1, up is positive, 0.15 deadzone) or <code>left_trigger</code>, <code>right_trigger</code> (0 to 1).</dd>
+  </dl>
+  <p>Pad buttons also work in <code>grodot.toml</code> and with <code>Input</code>. The names are <code>PadA</code>, <code>PadB</code>, <code>PadX</code>, <code>PadY</code>, <code>PadLB</code>, <code>PadRB</code>, <code>PadBack</code>, <code>PadStart</code>, <code>PadGuide</code>, <code>PadLS</code>, <code>PadRS</code> and <code>PadDpadUp</code>, <code>PadDpadDown</code>, <code>PadDpadLeft</code>, <code>PadDpadRight</code>, for example <code>jump = "Space, PadA"</code>. While a pad is connected, the left stick also drives <code>move_left</code>/<code>move_right</code> and <code>move_forward</code>/<code>move_back</code>. The larger of keyboard and stick wins.</p>
+  <p>Button numbers follow the common Xbox-style layout on Linux. Pads that number their buttons differently may need a different binding.</p>
 
   <h3 id="api-time" data-toc="Time">Time</h3>
   <dl class="api">
@@ -1022,6 +1035,41 @@ end</code></pre>
     <li>For a character: a dynamic RigidBody plus a box Collider, set <code>velocity</code> each frame, and jump only when <code>on_floor?()</code>.</li>
   </ul>
 
+  <h3 id="api-animation" data-toc="Animation">Animation</h3>
+  <p>Put an AnimationPlayer on an entity whose MeshRenderer shows a glTF model. Get it with <code>get_component("AnimationPlayer")</code>.</p>
+  <dl class="api">
+    <dt>play(clip, crossfade = nil, looping = nil)</dt><dd>Switch to a clip, blending from the current pose over <code>crossfade</code> seconds (the component's default if nil). Does nothing if that clip is already playing. An unknown clip is an error at the script line, and the message lists the clips the model has. <span class="r">&rarr; true</span></dd>
+    <dt>stop() pause() resume()</dt><dd>Stop clears the clip. Pause and resume keep the place in the clip.</dd>
+    <dt>playing?() current_clip clips() has_clip?(name)</dt><dd><code>current_clip</code> is a clip name, or nil.</dd>
+    <dt>time length</dt><dd>Playback position and clip length in seconds. <code>time</code> can be set.</dd>
+  </dl>
+<pre class="code" data-gro><code>function update(delta)
+  anim = self.get_component("AnimationPlayer")
+  if moving
+    anim.play("run")
+  else
+    anim.play("idle")
+  end
+end
+
+# Called when a clip that does not loop reaches its end.
+function on_animation_finished(clip)
+  @busy = false
+end</code></pre>
+
+  <h3 id="api-particles" data-toc="Particles">Particles</h3>
+  <dl class="api">
+    <dt>start() stop()</dt><dd>Turn emission on or off. A stopped emitter lets its live particles die out.</dd>
+    <dt>emit_burst(n)</dt><dd>Spawn n particles on the next frame, whatever the rate (for explosions). The total is capped at <code>max_particles</code>.</dd>
+    <dt>count()</dt><dd>How many particles are alive now.</dd>
+  </dl>
+<pre class="code" data-gro><code>function update(delta)
+  emitter = self.get_component("ParticleEmitter")
+  if Input.just_pressed("explode")
+    emitter.emit_burst(120)
+  end
+end</code></pre>
+
   <h3 id="api-audio" data-toc="Audio">Audio</h3>
   <dl class="api">
     <dt>Audio.play(clip, volume = 1)</dt><dd>Play a sound once. Returns false (with a console warning) if the file is missing.</dd>
@@ -1047,11 +1095,32 @@ function toggle()
 end</code></pre>
   <p>The callback is a method symbol (<code>:explode</code>, called on the script that set the timer) or a function name. Timers stop when their entity is destroyed.</p>
 
-  <h3 id="api-ui" data-toc="UI (HUD)">UI (HUD)</h3>
+  <h3 id="api-ui" data-toc="UI (HUD and menus)">UI (HUD and menus)</h3>
+  <p>The UI is immediate mode: call the widgets from <code>update</code> every frame. Nothing is kept between frames except focus. Coordinates are pixels from the top-left of the game area (the window, or the editor's viewport). <code>UI.screen_size()</code> gives the size, so you can centre a menu.</p>
   <dl class="api">
     <dt>UI.text(values...)</dt><dd>Show a line in the top-left HUD panel for this frame. Call it from <code>update</code> every frame.</dd>
     <dt>UI.message(title, subtitle = nil)</dt><dd>A big centred message for this frame, like "You win!".</dd>
+    <dt>UI.panel(x, y, w, h)</dt><dd>A panel. Uses the skin if one is set.</dd>
+    <dt>UI.label(text, x, y, large = false)</dt><dd>Text at a position. <code>large</code> uses the title font.</dd>
+    <dt>UI.button(label, x, y, w, h) <span class="r">&rarr; true on the frame it is activated</span></dt><dd>A button. It is activated by a mouse click, or by Enter, Space or pad A while it has focus. Focus moves with the arrow keys or the D-pad, in the order the buttons were drawn last frame. Hovering the mouse over a button focuses it. The label is the button's identity, so give each button a different label.</dd>
+    <dt>UI.image(path, x, y, w, h, border = 0)</dt><dd>A <code>.png</code> or <code>.bmp</code> image, stretched. With a <code>border</code> in texels it is drawn as a nine-slice, so its corners keep their size.</dd>
+    <dt>UI.skin(path, border = 8) UI.skin(nil)</dt><dd>Use a nine-slice image for every panel and button. Pass nil to go back to flat colours.</dd>
+    <dt>UI.screen_size()</dt><dd>Vector2 of the game area in pixels.</dd>
   </dl>
+<pre class="code" data-gro><code>function update(delta)
+  UI.skin("assets/ui/panel.png", 6)
+  size = UI.screen_size()
+  cx = size.x / 2
+  UI.panel(cx - 180, 150, 360, 200)
+  UI.label("Grodot", cx - 60, 170, true)
+  if UI.button("Play", cx - 120, 240, 240, 48)
+    Scene.load("scenes/game.gscene")
+  end
+  if UI.button("Quit", cx - 120, 300, 240, 48)
+    Game.quit()
+  end
+end</code></pre>
+  <p>Navigation actions can be rebound: name actions <code>ui_up</code>, <code>ui_down</code> or <code>ui_confirm</code> in <code>[input]</code>. Without them the arrow keys, the D-pad, Enter, Space and pad A are used. Focus is forgotten when a scene changes.</p>
 
   <h3 id="api-debug" data-toc="Debug, Assets, Game">Debug, Assets and Game</h3>
   <dl class="api">
@@ -1061,6 +1130,7 @@ end</code></pre>
     <dt>Assets.exists?(path)</dt><dd>Does a project file exist?</dd>
     <dt>Assets.load(path)</dt><dd>A Resource with <code>path</code> and <code>kind</code> (<code>"audio"</code>, <code>"mesh"</code>, <code>"scene"</code>, <code>"script"</code>, <code>"file"</code>). Accepted wherever a path is.</dd>
     <dt>Game.quit()</dt><dd>Close the game window (in the editor: stop playing).</dd>
+    <dt>Game.pause() Game.resume() Game.paused?()</dt><dd>Pause the game. Physics, timers, animations and particles stop. Scripts keep running, so a pause menu still works; check <code>Game.paused?()</code> in your own code to stop gameplay. A scene change clears the pause.</dd>
   </dl>
 </section>
 

@@ -28,13 +28,16 @@ equivalent capability, not identical syntax, unless stated. Status: **Done**,
 | Scene inheritance / instancing | Missing | |
 | Resources and `.tres` | Missing | |
 | 2D: Camera2D, coloured Sprite2D | Partial | No textures, tile maps, or 2D physics. |
-| 3D: meshes, software rasterizer | Partial | No glTF, materials beyond flat colour, or GPU backend. |
+| 3D: meshes, software rasterizer | Partial | Textured materials (mipmapped, filtered, alpha cutout and blend), glTF 2.0 static and skinned meshes, emissive. No Draco or KTX2, no PBR specular or normal maps, no GPU backend. |
 | Physics (3D bodies/colliders) | Partial | |
-| Input | Partial | Keyboard/mouse; no gamepad or action map editor. |
+| Input | Partial | Keyboard, mouse, and gamepad (Linux joystick API, polled); no action map editor, rumble, or hot-plug events. |
 | Audio | Partial | WAV only. |
-| Animation (AnimationPlayer, tweens) | Missing | |
-| UI/Control nodes | Missing | |
+| Animation (AnimationPlayer, tweens) | Partial | glTF clips with crossfades, looping, speed, and `on_animation_finished`. No tweens, blend trees, or state machines. |
+| UI/Control nodes | Partial | Immediate-mode buttons, panels, labels, images, and nine-slice skins, with focus navigation. No retained Control tree, layout containers, or text fields. |
 | Editor | Partial | Move gizmo only; no multi-select. |
+| Lights and shadows | Partial | Directional, point, and spot lights; shadow maps for up to two directional lights. No point or spot shadows. |
+| Particles | Partial | CPU emitters with bursts, gradients and textures. No GPU particles, collisions, or sub-emitters; blending is alpha only, not additive. |
+| Hot reload | Partial | Play mode reloads scripts (keeping their state), scenes, textures and models. No live reload outside play mode. |
 | Export platforms | Partial | Linux only. |
 
 Update this file whenever a row changes.
