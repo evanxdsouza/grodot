@@ -1,13 +1,23 @@
 //! Renders a [`Scene`] (shared by the editor viewport and the game runtime).
 
 use crate::canvas::{blend, Canvas, Rect};
-use crate::raster::{self, DrawItem, Lighting, View};
+use crate::raster::{self, DrawItem, Lighting, RMaterial, View};
+use crate::texture::Texture;
 use grodot_core::math::{Color, Mat4, Quat, Vec3};
 use grodot_core::mesh::Mesh;
-use grodot_core::scene::{Component, EntityId, Scene, Shape};
+use grodot_core::scene::{Component, EntityId, Material, Scene, Shape};
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::rc::Rc;
+use std::sync::Arc;
+
+/// Image formats the texture loader understands.
+pub const TEXTURE_EXTENSIONS: &[&str] = &["png", "bmp"];
+
+pub fn is_texture_path(p: &str) -> bool {
+    let l = p.to_lowercase();
+    TEXTURE_EXTENSIONS.iter().any(|e| l.ends_with(&format!(".{}", e)))
+}
 
 type SpritePick = (i32, usize, EntityId, Vec<(f32, f32)>);
 
@@ -21,6 +31,7 @@ pub struct RenderOptions {
 
 pub struct SceneRenderer {
     meshes: HashMap<String, Option<Rc<Mesh>>>,
+    textures: HashMap<String, Option<Arc<Texture>>>,
     /// Project root used to resolve `.obj` mesh paths.
     pub root: Option<PathBuf>,
     /// Asset problems found while rendering (each reported once).
@@ -29,12 +40,59 @@ pub struct SceneRenderer {
 
 impl SceneRenderer {
     pub fn new(root: Option<PathBuf>) -> Self {
-        SceneRenderer { meshes: HashMap::new(), root, warnings: Vec::new() }
+        SceneRenderer { meshes: HashMap::new(), textures: HashMap::new(), root, warnings: Vec::new() }
     }
 
-    /// Forget cached meshes (e.g. after files changed on disk).
+    /// Forget cached meshes and textures (e.g. after files changed on disk).
     pub fn clear_cache(&mut self) {
         self.meshes.clear();
+        self.textures.clear();
+    }
+
+    /// Forget one cached asset so it is reloaded next frame (hot reload).
+    pub fn invalidate(&mut self, path: &str) {
+        self.meshes.remove(path);
+        self.textures.remove(path);
+    }
+
+    /// Load (and cache) a project texture. Problems are reported once in `warnings`.
+    pub fn texture(&mut self, path: &str) -> Option<Arc<Texture>> {
+        if let Some(t) = self.textures.get(path) {
+            return t.clone();
+        }
+        let loaded = (|| -> Result<Arc<Texture>, String> {
+            let root = self.root.as_ref().ok_or("no project folder")?;
+            let full = grodot_core::config::resolve_in(root, path)?;
+            let bytes = std::fs::read(&full).map_err(|e| e.to_string())?;
+            let img = grodot_core::image::decode(&bytes).map_err(|e| e.to_string())?;
+            Ok(Arc::new(Texture::from_image(&img)))
+        })();
+        let t = match loaded {
+            Ok(t) => Some(t),
+            Err(e) => {
+                self.warnings.push(format!("texture '{}': {}", path, e));
+                None
+            }
+        };
+        self.textures.insert(path.to_string(), t.clone());
+        t
+    }
+
+    /// Resolve a scene material (loading its texture) for the rasterizer.
+    pub fn material(&mut self, m: &Material, lit: bool) -> RMaterial {
+        let c = m.base_color;
+        RMaterial {
+            base_color: [c.r, c.g, c.b, c.a],
+            texture: m.texture.as_deref().and_then(|t| self.texture(t)),
+            uv_scale: [m.uv_scale.x, m.uv_scale.y],
+            uv_offset: [m.uv_offset.x, m.uv_offset.y],
+            filter: m.filter,
+            wrap: m.wrap,
+            alpha_mode: m.alpha_mode,
+            alpha_cutoff: m.alpha_cutoff,
+            double_sided: m.double_sided,
+            lit,
+        }
     }
 
     pub fn mesh(&mut self, name: &str) -> Option<Rc<Mesh>> {
@@ -130,21 +188,22 @@ impl SceneRenderer {
     pub fn render(&mut self, canvas: &mut Canvas, viewport: Rect, scene: &Scene, view: &View, opts: &RenderOptions) {
         Self::draw_background(canvas, viewport, scene.environment.background);
         let light = Self::lighting(scene, view);
-        let mut meshes: Vec<(Rc<Mesh>, Mat4, Color, bool)> = Vec::new();
+        let mut meshes: Vec<(Rc<Mesh>, Mat4, RMaterial)> = Vec::new();
         for e in &scene.entities {
             let Some(mr) = e.mesh() else { continue };
             if !mr.visible || !scene.is_active_in_hierarchy(e.id) {
                 continue;
             }
             if let Some(mesh) = self.mesh(&mr.mesh) {
-                meshes.push((mesh, scene.world_matrix(e.id), mr.color, mr.lit));
+                let mat = self.material(&mr.material, mr.lit);
+                meshes.push((mesh, scene.world_matrix(e.id), mat));
             }
         }
         // Blob shadows: soft dark discs under lit meshes, drawn as flat geometry.
         let disc = shadow_disc();
         let mut shadows = Vec::new();
-        for (mesh, model, _, lit) in &meshes {
-            if !*lit {
+        for (mesh, model, mat) in &meshes {
+            if !mat.lit || mat.alpha_mode != grodot_core::scene::AlphaMode::Opaque {
                 continue;
             }
             let (lo, hi) = mesh.bounds();
@@ -171,7 +230,7 @@ impl SceneRenderer {
             }
         }
         let mut items: Vec<DrawItem> =
-            meshes.iter().map(|(m, model, c, lit)| DrawItem { mesh: m, model: *model, color: *c, lit: *lit }).collect();
+            meshes.iter().map(|(m, model, mat)| DrawItem { mesh: m, model: *model, material: mat.clone() }).collect();
         raster::draw_meshes(canvas, viewport, view, &light, &items);
         items.clear();
         // Shadows are drawn as darkened unlit discs blended by depth test.
@@ -431,9 +490,9 @@ pub fn ray_aabb(o: Vec3, d: Vec3, lo: Vec3, hi: Vec3) -> Option<f32> {
     }
 }
 
-fn ground_height(_scene: &Scene, meshes: &[(Rc<Mesh>, Mat4, Color, bool)], p: Vec3, below: f32) -> Option<f32> {
+fn ground_height(_scene: &Scene, meshes: &[(Rc<Mesh>, Mat4, RMaterial)], p: Vec3, below: f32) -> Option<f32> {
     let mut best: Option<f32> = None;
-    for (m, model, _, _) in meshes {
+    for (m, model, _) in meshes {
         let (lo, hi) = m.bounds();
         let wlo = model.transform_point(lo);
         let whi = model.transform_point(hi);

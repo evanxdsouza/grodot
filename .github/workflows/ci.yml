@@ -27,6 +27,8 @@ jobs:
       - name: Check and play the sample game headlessly
         run: |
           ./target/release/grodot check examples/orb-garden
+          ./target/release/grodot check examples/textured-demo
+          ./target/release/grodot run examples/textured-demo --headless --frames 120
           ./target/release/grodot run examples/orb-garden --headless --frames 600 --screenshot game.png
       - name: Create, check and run a new project
         run: |

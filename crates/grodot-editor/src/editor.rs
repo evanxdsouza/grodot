@@ -219,6 +219,11 @@ impl Editor {
                     self.log.warn(format!("'{}': script '{}' does not exist", e.name, s.path));
                 }
             }
+            if let Some(t) = e.mesh().and_then(|m| m.material.texture.as_ref()) {
+                if !self.project.resolve(t).map(|p| p.is_file()).unwrap_or(false) {
+                    self.log.warn(format!("'{}': texture '{}' does not exist", e.name, t));
+                }
+            }
             if let Some(Component::AudioSource(a)) = e.get("AudioSource") {
                 if !a.clip.is_empty() && !self.project.resolve(&a.clip).map(|p| p.is_file()).unwrap_or(false) {
                     self.log.warn(format!("'{}': audio clip '{}' does not exist", e.name, a.clip));
@@ -1122,6 +1127,21 @@ impl Editor {
                             new_value = Some(FieldValue::Vec3(Vec3::from_array(vals)));
                         }
                     }
+                    FieldValue::Vec2(v) => {
+                        let cw = (wr.w - 4) / 2;
+                        let mut vals = [v.x, v.y];
+                        let accents = [AXIS_X, AXIS_Y];
+                        let mut changed = false;
+                        for i in 0..2 {
+                            let cr = Rect::new(wr.x + i as i32 * (cw + 4), wr.y, cw, 24);
+                            if self.ui.drag_number(fid(&i.to_string()), cr, &mut vals[i], 0.01, Some(accents[i])) {
+                                changed = true;
+                            }
+                        }
+                        if changed {
+                            new_value = Some(FieldValue::Vec2(grodot_core::math::Vec2::new(vals[0], vals[1])));
+                        }
+                    }
                     FieldValue::Float(f) => {
                         let mut v = *f;
                         let speed = if fname == "field_of_view" || fname == "far_clip" { 0.5 } else { 0.01 };
@@ -1150,7 +1170,7 @@ impl Editor {
                         let mut s = t.clone();
                         let pick = matches!(
                             (cname.as_str(), fname),
-                            ("MeshRenderer", "mesh") | ("AudioSource", "clip") | ("Script", "path")
+                            ("MeshRenderer", "mesh" | "texture") | ("AudioSource", "clip") | ("Script", "path")
                         );
                         let tw = if pick { wr.w - 30 } else { wr.w };
                         if self.ui.text_field(fid("t"), Rect::new(wr.x, wr.y, tw, 24), &mut s) {
@@ -1179,6 +1199,39 @@ impl Editor {
                     }
                 }
                 y += 30;
+                // Texture preview under the texture field.
+                if let (true, FieldValue::Text(t)) = (fname == "texture", &value) {
+                    if !t.is_empty() {
+                        let pr = Rect::new(x0 + label_w, y, 64, 64);
+                        match self.renderer.texture(t) {
+                            Some(tex) => {
+                                draw_checker(&mut self.ui.canvas, pr);
+                                grodot_render::texture::draw_texture(&mut self.ui.canvas, pr, &tex);
+                                self.ui.canvas.stroke_rect(pr, BORDER);
+                                let info = format!(
+                                    "{} x {}{}",
+                                    tex.width(),
+                                    tex.height(),
+                                    if tex.has_alpha { ", alpha" } else { "" }
+                                );
+                                self.ui.label_in(
+                                    Rect::new(pr.right() + 10, pr.y, fw - label_w - 74, 22),
+                                    &info,
+                                    TEXT_DIM,
+                                );
+                            }
+                            None => {
+                                self.ui.canvas.stroke_rect(pr, RED);
+                                self.ui.label_in(
+                                    Rect::new(pr.right() + 10, pr.y, fw - label_w - 74, 22),
+                                    "cannot load",
+                                    RED,
+                                );
+                            }
+                        }
+                        y += 72;
+                    }
+                }
             }
             if cname == "Script" && !playing {
                 let path = match scene.entity(sel).unwrap().script() {
@@ -1213,6 +1266,18 @@ impl Editor {
     }
 }
 
+const NO_TEXTURE: &str = "(no texture)";
+
+/// Grey checkerboard behind transparent texture previews.
+fn draw_checker(canvas: &mut grodot_render::Canvas, r: Rect) {
+    for cy in (0..r.h).step_by(8) {
+        for cx in (0..r.w).step_by(8) {
+            let c = if (cx / 8 + cy / 8) % 2 == 0 { 0x5a5d63 } else { 0x3c3f45 };
+            canvas.fill_rect(Rect::new(r.x + cx, r.y + cy, 8.min(r.w - cx), 8.min(r.h - cy)), c);
+        }
+    }
+}
+
 fn asset_options(assets: &[String], comp: &str, field: &str) -> Vec<String> {
     {
         let mut opts: Vec<String> = Vec::new();
@@ -1225,6 +1290,10 @@ fn asset_options(assets: &[String], comp: &str, field: &str) -> Vec<String> {
                 opts.extend(assets.iter().filter(|a| a.to_lowercase().ends_with(".wav")).cloned())
             }
             ("Script", "path") => opts.extend(assets.iter().filter(|a| a.ends_with(".gro")).cloned()),
+            ("MeshRenderer", "texture") => {
+                opts.push(NO_TEXTURE.to_string());
+                opts.extend(assets.iter().filter(|a| grodot_render::scene_render::is_texture_path(a)).cloned());
+            }
             _ => {}
         }
         opts
@@ -1404,6 +1473,24 @@ impl Editor {
                     let _ = e.get_mut("AudioSource").unwrap().set_field("clip", FieldValue::Text(sel.clone()));
                 }
             }
+        } else if grodot_render::scene_render::is_texture_path(&lower) {
+            let pr = Rect::new(x, y, 96, 96);
+            if let Some(tex) = self.renderer.texture(&sel) {
+                draw_checker(&mut self.ui.canvas, pr);
+                grodot_render::texture::draw_texture(&mut self.ui.canvas, pr, &tex);
+                self.ui.canvas.stroke_rect(pr, BORDER);
+                let info = format!("{} x {}", tex.width(), tex.height());
+                self.ui.label_in(Rect::new(x + 106, y, 140, 22), &info, TEXT_DIM);
+            }
+            if let Some(id) = sel_entity {
+                if self.ui.button(Rect::new(x + 106, y + 30, bw.min(side.w - 130), 26), "Use as texture") {
+                    let e = self.scene.entity_mut(id).unwrap();
+                    if !e.has("MeshRenderer") {
+                        e.add(Component::new_default("MeshRenderer").unwrap());
+                    }
+                    let _ = e.get_mut("MeshRenderer").unwrap().set_field("texture", FieldValue::Text(sel.clone()));
+                }
+            }
         } else if lower.ends_with(".obj") {
             if let Some(id) = sel_entity {
                 if self.ui.button(Rect::new(x, y, bw, 26), "Use as mesh") {
@@ -1497,7 +1584,8 @@ impl Editor {
                                     None => &mut self.scene,
                                 };
                                 if let Some(c) = scene.entity_mut(sel).and_then(|e| e.get_mut(&component)) {
-                                    let _ = c.set_field(&field, FieldValue::Text(options[i].clone()));
+                                    let v = if options[i] == NO_TEXTURE { String::new() } else { options[i].clone() };
+                                    let _ = c.set_field(&field, FieldValue::Text(v));
                                 }
                             }
                         }
@@ -1643,12 +1731,17 @@ fn asset_icon(path: &str) -> (u32, &'static str) {
         (0x6ea0ff, "M")
     } else if l.ends_with(".gprefab") {
         (0x4fc3c3, "P")
+    } else if grodot_render::scene_render::is_texture_path(&l) {
+        (0xe0a050, "T")
     } else {
         (0x80848c, "F")
     }
 }
 
 fn pretty_label(s: &str) -> String {
+    if let Some(rest) = s.strip_prefix("uv_") {
+        return format!("UV {}", rest);
+    }
     let mut out = String::new();
     for (i, w) in s.split('_').enumerate() {
         if i > 0 {

@@ -1,0 +1,8 @@
+# Slowly turns the crate so you can see every face of its texture.
+class Spinner < Entity
+  SPEED = 25
+
+  function update(delta)
+    self.rotate(Vector3.new(0, SPEED * delta, 0))
+  end
+end

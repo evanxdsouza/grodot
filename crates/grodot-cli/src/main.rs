@@ -298,6 +298,9 @@ fn check_project(dir: &Path) -> Result<usize, String> {
             }
             if let Some(m) = e.mesh() {
                 need("mesh", &m.mesh);
+                if let Some(t) = &m.material.texture {
+                    need("texture", t);
+                }
             }
             if let Some(grodot_core::Component::AudioSource(a)) = e.get("AudioSource") {
                 need("audio clip", &a.clip);

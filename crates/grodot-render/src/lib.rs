@@ -9,6 +9,7 @@ pub mod canvas;
 pub mod font;
 pub mod raster;
 pub mod scene_render;
+pub mod texture;
 
 pub use canvas::{rgb, Canvas, Rect, Rgb};
 pub use font::FontId;

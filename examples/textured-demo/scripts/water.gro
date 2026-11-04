@@ -1,0 +1,8 @@
+# Scrolls the water texture to make it look like it flows.
+class Water < Entity
+  FLOW = Vector2.new(0.06, 0.025)
+
+  function update(delta)
+    self.material.uv_offset = self.material.uv_offset + FLOW * delta
+  end
+end

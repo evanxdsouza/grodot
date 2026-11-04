@@ -2,6 +2,8 @@
 //! scene/entity/component model. This crate has no dependencies.
 
 pub mod config;
+pub mod image;
+pub mod inflate;
 pub mod json;
 pub mod math;
 pub mod mesh;

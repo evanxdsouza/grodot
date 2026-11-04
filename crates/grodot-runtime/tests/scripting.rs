@@ -313,3 +313,56 @@ end
     assert!(matches!(field(&rt, "Emitter", "is_connected_after"), Value::Bool(false)));
     assert!(matches!(field(&rt, "Receiver", "value"), Value::Number(n) if n == 42.0));
 }
+
+#[test]
+fn material_bindings_animate_uvs_and_report_bad_textures() {
+    let p = TempProject::new("material");
+    std::fs::create_dir_all(p.root.join("assets/textures")).unwrap();
+    let fixture = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../grodot-core/tests/fixtures/images/rgba8.png");
+    std::fs::copy(fixture, p.root.join("assets/textures/t.png")).unwrap();
+    p.write(
+        "scripts/w.gro",
+        r#"class W < Entity
+  function ready()
+    self.material.texture = "assets/textures/t.png"
+    self.material.uv_scale = Vector2.new(4, 2)
+    self.material.alpha_mode = "cutout"
+  end
+  function update(delta)
+    self.material.uv_offset = self.material.uv_offset + Vector2.new(1, 0.5) * delta
+    @tex = self.material.texture
+    @fields = self.material.fields().length()
+    @mode = self.get_component("MeshRenderer").alpha_mode
+  end
+end
+"#,
+    );
+    p.write(
+        "scripts/bad.gro",
+        "class Bad < Entity\n  function ready()\n    self.material.texture = \"assets/textures/nope.png\"\n  end\nend\n",
+    );
+    let mut scene = scene_with_scripts(&[("W", "scripts/w.gro"), ("Bad", "scripts/bad.gro")]);
+    for e in scene.entities.iter_mut() {
+        e.add(Component::new_default("MeshRenderer").unwrap());
+    }
+    let mut rt = Runtime::new(scene, Some(p.root.clone()), Default::default());
+    for _ in 0..10 {
+        rt.frame(0.1);
+    }
+    let errs = errors(&rt);
+    assert_eq!(errs.len(), 1, "{:?}", errs);
+    assert!(errs[0].contains("texture 'assets/textures/nope.png' not found"), "{}", errs[0]);
+    assert!(errs[0].contains("File: scripts/bad.gro") && errs[0].contains("Line: 3"), "{}", errs[0]);
+    assert!(matches!(field(&rt, "W", "tex"), Value::Str(s) if &*s == "assets/textures/t.png"));
+    assert!(matches!(field(&rt, "W", "fields"), Value::Number(n) if n == 9.0));
+    assert!(matches!(field(&rt, "W", "mode"), Value::Str(s) if &*s == "cutout"));
+    let w = rt.world.borrow();
+    let mr = w.scene.find_by_name("W").unwrap().mesh().unwrap().clone();
+    assert!(
+        (mr.material.uv_offset.x - 1.0).abs() < 1e-4,
+        "10 frames x 0.1 s x 1 unit/s = 1, got {}",
+        mr.material.uv_offset.x
+    );
+    assert!((mr.material.uv_offset.y - 0.5).abs() < 1e-4);
+    assert_eq!(mr.material.uv_scale, grodot_core::math::Vec2::new(4.0, 2.0));
+}

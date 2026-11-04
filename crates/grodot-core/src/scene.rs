@@ -5,7 +5,7 @@
 //! JSON (`.gscene`); prefabs (`.gprefab`) use the same format.
 
 use crate::json::{self, Json};
-use crate::math::{Color, Mat4, Quat, Vec3};
+use crate::math::{Color, Mat4, Quat, Vec2, Vec3};
 
 pub const SCENE_VERSION: u32 = 1;
 
@@ -62,10 +62,243 @@ pub struct MeshRenderer {
     /// A primitive (`cube`, `sphere`, `plane`, `cylinder`, `capsule`) or a
     /// project-relative `.obj` path.
     pub mesh: String,
-    pub color: Color,
+    pub material: Material,
     /// Unlit meshes ignore lighting (good for UI-like markers and skies).
     pub lit: bool,
     pub visible: bool,
+}
+
+/// How a texture is sampled.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TextureFilter {
+    /// Blocky, no smoothing (pixel art).
+    Nearest,
+    /// Smooth between texels, no mipmaps.
+    Bilinear,
+    /// Smooth, with mipmaps blended for distant surfaces (the default).
+    Trilinear,
+}
+
+/// What happens outside the 0..1 texture range.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TextureWrap {
+    Repeat,
+    Clamp,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AlphaMode {
+    /// Alpha is ignored.
+    Opaque,
+    /// Pixels with alpha below `alpha_cutoff` are discarded (foliage, fences).
+    Cutout,
+    /// Alpha-blended, drawn after opaque surfaces from back to front (glass, water).
+    Blend,
+}
+
+pub const FILTER_NAMES: &[&str] = &["nearest", "bilinear", "trilinear"];
+pub const WRAP_NAMES: &[&str] = &["repeat", "clamp"];
+pub const ALPHA_MODE_NAMES: &[&str] = &["opaque", "cutout", "blend"];
+
+impl TextureFilter {
+    pub fn name(self) -> &'static str {
+        FILTER_NAMES[self as usize]
+    }
+    pub fn parse(s: &str) -> Option<Self> {
+        Some(match s {
+            "nearest" => TextureFilter::Nearest,
+            "bilinear" => TextureFilter::Bilinear,
+            "trilinear" => TextureFilter::Trilinear,
+            _ => return None,
+        })
+    }
+}
+
+impl TextureWrap {
+    pub fn name(self) -> &'static str {
+        WRAP_NAMES[self as usize]
+    }
+    pub fn parse(s: &str) -> Option<Self> {
+        Some(match s {
+            "repeat" => TextureWrap::Repeat,
+            "clamp" => TextureWrap::Clamp,
+            _ => return None,
+        })
+    }
+}
+
+impl AlphaMode {
+    pub fn name(self) -> &'static str {
+        ALPHA_MODE_NAMES[self as usize]
+    }
+    pub fn parse(s: &str) -> Option<Self> {
+        Some(match s {
+            "opaque" => AlphaMode::Opaque,
+            "cutout" => AlphaMode::Cutout,
+            "blend" => AlphaMode::Blend,
+            _ => return None,
+        })
+    }
+}
+
+/// Surface appearance of a mesh.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Material {
+    /// Multiplies the texture (or is the colour when there is no texture).
+    pub base_color: Color,
+    /// Project-relative `.png` or `.bmp`, usually in `assets/textures/`.
+    pub texture: Option<String>,
+    /// UV = mesh UV * uv_scale + uv_offset. Scale 4 repeats the texture 4 times.
+    pub uv_scale: Vec2,
+    pub uv_offset: Vec2,
+    pub filter: TextureFilter,
+    pub wrap: TextureWrap,
+    pub alpha_mode: AlphaMode,
+    pub alpha_cutoff: f32,
+    /// Draw both sides of each triangle (needed for flat foliage cards).
+    pub double_sided: bool,
+}
+
+impl Default for Material {
+    fn default() -> Self {
+        Material {
+            base_color: Color::rgb(0.8, 0.8, 0.8),
+            texture: None,
+            uv_scale: Vec2::ONE,
+            uv_offset: Vec2::ZERO,
+            filter: TextureFilter::Trilinear,
+            wrap: TextureWrap::Repeat,
+            alpha_mode: AlphaMode::Opaque,
+            alpha_cutoff: 0.5,
+            double_sided: false,
+        }
+    }
+}
+
+/// Names of the MeshRenderer fields that belong to its material (used by `entity.material`).
+pub const MATERIAL_FIELDS: &[&str] =
+    &["base_color", "texture", "uv_scale", "uv_offset", "filter", "wrap", "alpha_mode", "alpha_cutoff", "double_sided"];
+
+impl Material {
+    pub fn fields(&self) -> Vec<(&'static str, FieldValue)> {
+        use FieldValue as F;
+        vec![
+            ("base_color", F::Color(self.base_color)),
+            ("texture", F::Text(self.texture.clone().unwrap_or_default())),
+            ("uv_scale", F::Vec2(self.uv_scale)),
+            ("uv_offset", F::Vec2(self.uv_offset)),
+            ("filter", F::Choice(self.filter.name().into(), FILTER_NAMES)),
+            ("wrap", F::Choice(self.wrap.name().into(), WRAP_NAMES)),
+            ("alpha_mode", F::Choice(self.alpha_mode.name().into(), ALPHA_MODE_NAMES)),
+            ("alpha_cutoff", F::Float(self.alpha_cutoff)),
+            ("double_sided", F::Bool(self.double_sided)),
+        ]
+    }
+
+    /// Returns Ok(true) if the field belongs to the material and was set.
+    pub fn set_field(&mut self, name: &str, v: FieldValue) -> Result<bool, String> {
+        use FieldValue as F;
+        let bad = |what: &str| Err(format!("material.{} must be {}", name, what));
+        match (name, v) {
+            ("base_color" | "color", F::Color(c)) => self.base_color = c,
+            ("base_color" | "color", _) => return bad("a Color"),
+            ("texture", F::Text(t)) => {
+                let t = t.trim().to_string();
+                self.texture = if t.is_empty() { None } else { Some(t) };
+            }
+            ("texture", _) => return bad("a texture path string (or \"\" for none)"),
+            ("uv_scale", F::Vec2(v)) if v.is_finite() => self.uv_scale = v,
+            ("uv_offset", F::Vec2(v)) if v.is_finite() => self.uv_offset = v,
+            ("uv_scale" | "uv_offset", _) => return bad("a Vector2"),
+            ("filter", F::Choice(s, _) | F::Text(s)) => {
+                self.filter = TextureFilter::parse(&s)
+                    .ok_or_else(|| format!("filter must be one of {}", FILTER_NAMES.join(", ")))?
+            }
+            ("wrap", F::Choice(s, _) | F::Text(s)) => {
+                self.wrap =
+                    TextureWrap::parse(&s).ok_or_else(|| format!("wrap must be one of {}", WRAP_NAMES.join(", ")))?
+            }
+            ("alpha_mode", F::Choice(s, _) | F::Text(s)) => {
+                self.alpha_mode = AlphaMode::parse(&s)
+                    .ok_or_else(|| format!("alpha_mode must be one of {}", ALPHA_MODE_NAMES.join(", ")))?
+            }
+            ("filter" | "wrap" | "alpha_mode", _) => return bad("a string"),
+            ("alpha_cutoff", F::Float(f)) if f.is_finite() => self.alpha_cutoff = f.clamp(0.0, 1.0),
+            ("alpha_cutoff", _) => return bad("a number between 0 and 1"),
+            ("double_sided", F::Bool(b)) => self.double_sided = b,
+            ("double_sided", _) => return bad("true or false"),
+            _ => return Ok(false),
+        }
+        Ok(true)
+    }
+
+    pub fn to_json(&self) -> Json {
+        let mut j = Json::obj().with("base_color", self.base_color.to_hex());
+        if let Some(t) = &self.texture {
+            j = j.with("texture", t.as_str());
+        }
+        j.with("uv_scale", Json::Arr(vec![Json::from(self.uv_scale.x), Json::from(self.uv_scale.y)]))
+            .with("uv_offset", Json::Arr(vec![Json::from(self.uv_offset.x), Json::from(self.uv_offset.y)]))
+            .with("filter", self.filter.name())
+            .with("wrap", self.wrap.name())
+            .with("alpha_mode", self.alpha_mode.name())
+            .with("alpha_cutoff", self.alpha_cutoff)
+            .with("double_sided", self.double_sided)
+    }
+
+    pub fn from_json(j: &Json) -> Result<Material, String> {
+        let mut m = Material::default();
+        let ctx = |k: &str, what: &str| format!("MeshRenderer.material.{} must be {}", k, what);
+        if let Some(v) = j.get("base_color") {
+            m.base_color = v
+                .as_str()
+                .and_then(Color::from_hex)
+                .ok_or_else(|| ctx("base_color", "a hex colour like \"#ff8800\""))?;
+        }
+        match j.get("texture") {
+            None | Some(Json::Null) => {}
+            Some(Json::Str(s)) if s.is_empty() => {}
+            Some(Json::Str(s)) => m.texture = Some(s.clone()),
+            Some(_) => return Err(ctx("texture", "a string")),
+        }
+        let vec2 = |k: &str| -> Result<Option<Vec2>, String> {
+            match j.get(k) {
+                None => Ok(None),
+                Some(Json::Arr(a)) if a.len() == 2 => match (a[0].as_f64(), a[1].as_f64()) {
+                    (Some(x), Some(y)) => Ok(Some(Vec2::new(x as f32, y as f32))),
+                    _ => Err(ctx(k, "an array of 2 numbers")),
+                },
+                Some(_) => Err(ctx(k, "an array of 2 numbers")),
+            }
+        };
+        if let Some(v) = vec2("uv_scale")? {
+            m.uv_scale = v;
+        }
+        if let Some(v) = vec2("uv_offset")? {
+            m.uv_offset = v;
+        }
+        let choice = |k: &str| j.get(k).map(|v| v.as_str().map(|s| s.to_string()));
+        if let Some(v) = choice("filter") {
+            m.filter = v
+                .as_deref()
+                .and_then(TextureFilter::parse)
+                .ok_or_else(|| ctx("filter", "nearest, bilinear or trilinear"))?;
+        }
+        if let Some(v) = choice("wrap") {
+            m.wrap = v.as_deref().and_then(TextureWrap::parse).ok_or_else(|| ctx("wrap", "repeat or clamp"))?;
+        }
+        if let Some(v) = choice("alpha_mode") {
+            m.alpha_mode =
+                v.as_deref().and_then(AlphaMode::parse).ok_or_else(|| ctx("alpha_mode", "opaque, cutout or blend"))?;
+        }
+        if let Some(v) = j.get("alpha_cutoff") {
+            m.alpha_cutoff = v.as_f64().ok_or_else(|| ctx("alpha_cutoff", "a number"))? as f32;
+        }
+        if let Some(v) = j.get("double_sided") {
+            m.double_sided = v.as_bool().ok_or_else(|| ctx("double_sided", "true or false"))?;
+        }
+        Ok(m)
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -168,7 +401,7 @@ pub const COMPONENT_TYPES: [&str; 10] = [
     "Light",
 ];
 
-pub const PRIMITIVE_MESHES: [&str; 5] = ["cube", "sphere", "plane", "cylinder", "capsule"];
+pub const PRIMITIVE_MESHES: [&str; 6] = ["cube", "sphere", "plane", "quad", "cylinder", "capsule"];
 
 /// A reflected component field, used by the inspector and script bindings.
 #[derive(Debug, Clone, PartialEq)]
@@ -177,6 +410,7 @@ pub enum FieldValue {
     Bool(bool),
     Vec3(Vec3),
     Color(Color),
+    Vec2(Vec2),
     Text(String),
     Choice(String, &'static [&'static str]),
 }
@@ -211,7 +445,7 @@ impl Component {
             }),
             "MeshRenderer" => Component::MeshRenderer(MeshRenderer {
                 mesh: "cube".into(),
-                color: Color::rgb(0.8, 0.8, 0.8),
+                material: Material::default(),
                 lit: true,
                 visible: true,
             }),
@@ -268,12 +502,13 @@ impl Component {
                 ("visible", F::Bool(s.visible)),
                 ("z_index", F::Float(s.z_index as f32)),
             ],
-            Component::MeshRenderer(m) => vec![
-                ("mesh", F::Text(m.mesh.clone())),
-                ("color", F::Color(m.color)),
-                ("lit", F::Bool(m.lit)),
-                ("visible", F::Bool(m.visible)),
-            ],
+            Component::MeshRenderer(m) => {
+                let mut f = vec![("mesh", F::Text(m.mesh.clone()))];
+                f.extend(m.material.fields());
+                f.push(("lit", F::Bool(m.lit)));
+                f.push(("visible", F::Bool(m.visible)));
+                f
+            }
             Component::RigidBody(b) => vec![
                 ("body_type", F::Choice(b.body_type.name().into(), &["static", "dynamic", "kinematic"])),
                 ("mass", F::Float(b.mass)),
@@ -373,10 +608,6 @@ impl Component {
                 F::Text(s) => m.mesh = s,
                 _ => return bad(),
             },
-            (Component::MeshRenderer(m), "color") => match v {
-                F::Color(c) => m.color = c,
-                _ => return bad(),
-            },
             (Component::MeshRenderer(m), "lit") => match v {
                 F::Bool(b) => m.lit = b,
                 _ => return bad(),
@@ -385,6 +616,11 @@ impl Component {
                 F::Bool(b) => m.visible = b,
                 _ => return bad(),
             },
+            (Component::MeshRenderer(m), field) => {
+                if !m.material.set_field(field, v)? {
+                    return Err(format!("MeshRenderer has no property '{}'", field));
+                }
+            }
             (Component::RigidBody(b), "body_type") => match v {
                 F::Choice(s, _) | F::Text(s) => {
                     b.body_type = BodyType::parse(&s).ok_or_else(|| format!("unknown body type '{}'", s))?
@@ -506,7 +742,7 @@ impl Component {
                 .with("z_index", s.z_index as f32),
             Component::MeshRenderer(m) => base
                 .with("mesh", m.mesh.as_str())
-                .with("color", m.color.to_hex())
+                .with("material", m.material.to_json())
                 .with("lit", m.lit)
                 .with("visible", m.visible),
             Component::RigidBody(b) => base
@@ -642,8 +878,12 @@ impl Component {
                 if let Some(v) = str_of("mesh")? {
                     m.mesh = v;
                 }
+                if let Some(mj) = j.get("material") {
+                    m.material = Material::from_json(mj)?;
+                }
+                // Scenes written before materials existed store a flat "color".
                 if let Some(v) = color_of("color")? {
-                    m.color = v;
+                    m.material.base_color = v;
                 }
                 if let Some(v) = bool_of("lit")? {
                     m.lit = v;

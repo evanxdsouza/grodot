@@ -133,6 +133,24 @@ impl Neg for Vec3 {
     }
 }
 
+/// A 2D vector (texture coordinates, UV scale/offset).
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
+pub struct Vec2 {
+    pub x: f32,
+    pub y: f32,
+}
+
+impl Vec2 {
+    pub const ZERO: Vec2 = Vec2 { x: 0.0, y: 0.0 };
+    pub const ONE: Vec2 = Vec2 { x: 1.0, y: 1.0 };
+    pub const fn new(x: f32, y: f32) -> Vec2 {
+        Vec2 { x, y }
+    }
+    pub fn is_finite(self) -> bool {
+        self.x.is_finite() && self.y.is_finite()
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Vec4 {
     pub x: f32,

@@ -1,0 +1,16 @@
+# Press T to swap the pillar between stone and the checker texture,
+# or press Y to try a texture that does not exist (the console shows the line).
+class TextureSwap < Entity
+  function update(delta)
+    if Input.just_pressed("T")
+      if self.material.texture == "assets/textures/stone.png"
+        self.material.texture = "assets/textures/checker.png"
+      else
+        self.material.texture = "assets/textures/stone.png"
+      end
+    end
+    if Input.just_pressed("Y")
+      self.material.texture = "assets/textures/missing.png"
+    end
+  end
+end

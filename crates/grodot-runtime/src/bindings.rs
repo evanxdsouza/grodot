@@ -6,6 +6,7 @@
 
 use crate::physics;
 use crate::world::{AudioCmd, LogLevel, SignalConnection, SignalEvent, World};
+use grodot_core::math::Vec2;
 use grodot_core::math::{Color, Quat, Vec3};
 use grodot_core::scene::{BodyType, Component, EntityId, FieldValue, Scene, COMPONENT_TYPES};
 use groscript::builtins::{num_arg, str_arg, vec3_arg};
@@ -45,6 +46,7 @@ pub fn field_to_value(f: FieldValue) -> Value {
         FieldValue::Float(x) => Value::Number(x as f64),
         FieldValue::Bool(b) => Value::Bool(b),
         FieldValue::Vec3(v) => v3(v),
+        FieldValue::Vec2(v) => Value::Vec2(V2 { x: v.x as f64, y: v.y as f64 }),
         FieldValue::Color(c) => color_value(c),
         FieldValue::Text(s) => Value::str(&s),
         FieldValue::Choice(s, _) => Value::str(&s),
@@ -57,6 +59,11 @@ pub fn value_to_field(v: &Value, like: &FieldValue, name: &str) -> GroResult<Fie
         (FieldValue::Float(_), Value::Number(n)) => FieldValue::Float(*n as f32),
         (FieldValue::Bool(_), Value::Bool(b)) => FieldValue::Bool(*b),
         (FieldValue::Vec3(_), Value::Vec3(p)) => FieldValue::Vec3(to_vec3(p)),
+        (FieldValue::Vec2(_), Value::Vec2(p)) => FieldValue::Vec2(Vec2::new(p.x as f32, p.y as f32)),
+        (FieldValue::Text(_), Value::Nil) => FieldValue::Text(String::new()),
+        (FieldValue::Text(_), Value::Host(h)) if h.as_any().downcast_ref::<Resource>().is_some() => {
+            FieldValue::Text(h.as_any().downcast_ref::<Resource>().unwrap().path.clone())
+        }
         (FieldValue::Color(_), _) => FieldValue::Color(value_color(v).ok_or_else(bad)?),
         (FieldValue::Text(_), Value::Str(s)) => FieldValue::Text(s.to_string()),
         (FieldValue::Choice(_, opts), Value::Str(s) | Value::Symbol(s)) => FieldValue::Choice(s.to_string(), opts),
@@ -175,7 +182,7 @@ impl HostObject for EntityHandle {
     }
 
     fn get_property(&self, name: &str) -> Option<GroResult<Value>> {
-        const PROPS: [&str; 12] = [
+        const PROPS: [&str; 13] = [
             "id",
             "name",
             "tag",
@@ -188,6 +195,7 @@ impl HostObject for EntityHandle {
             "parent",
             "color",
             "visible",
+            "material",
         ];
         if !PROPS.contains(&name) {
             return None;
@@ -217,12 +225,16 @@ impl HostObject for EntityHandle {
                 None => Value::Nil,
             }),
             "color" => match e.mesh() {
-                Some(m) => Ok(color_value(m.color)),
+                Some(m) => Ok(color_value(m.material.base_color)),
                 None => engine_err(format!("entity '{}' has no MeshRenderer, so it has no color", e.name)),
             },
             "visible" => match e.mesh() {
                 Some(m) => Ok(Value::Bool(m.visible)),
                 None => engine_err(format!("entity '{}' has no MeshRenderer", e.name)),
+            },
+            "material" => match e.mesh() {
+                Some(_) => Ok(Value::Host(Rc::new(ComponentRef::material(self.id, &self.world)))),
+                None => engine_err(format!("entity '{}' has no MeshRenderer, so it has no material", e.name)),
             },
             _ => unreachable!(),
         })
@@ -242,7 +254,7 @@ impl HostObject for EntityHandle {
             "visible",
         ];
         if !PROPS.contains(&name) {
-            if name == "id" || name == "parent" {
+            if name == "id" || name == "parent" || name == "material" {
                 return Some(engine_err(format!("entity.{} is read-only", name)));
             }
             return None;
@@ -295,7 +307,7 @@ impl HostObject for EntityHandle {
                         GroError::new(ErrorKind::Type, "entity.color must be a Color (e.g. Color.new(1, 0, 0))")
                     })?;
                     match e.get_mut("MeshRenderer") {
-                        Some(Component::MeshRenderer(m)) => m.color = c,
+                        Some(Component::MeshRenderer(m)) => m.material.base_color = c,
                         _ => return engine_err(format!("entity '{}' has no MeshRenderer", e.name)),
                     }
                 }
@@ -488,11 +500,7 @@ impl HostObject for EntityHandle {
                 argc(1)?;
                 let n = Self::component_name(&args[0])?;
                 let has = self.with(|w| w.scene.entity(self.id).unwrap().has(&n))?;
-                Ok(if has {
-                    Value::Host(Rc::new(ComponentRef { entity: self.id, type_name: n, world: self.world.clone() }))
-                } else {
-                    Value::Nil
-                })
+                Ok(if has { Value::Host(Rc::new(ComponentRef::new(self.id, &n, &self.world))) } else { Value::Nil })
             })(),
             "add_component" => (|| {
                 argc(1)?;
@@ -507,7 +515,7 @@ impl HostObject for EntityHandle {
                         "scripts cannot be attached from scripts in v0.1; add the Script component in the editor",
                     );
                 }
-                Ok(Value::Host(Rc::new(ComponentRef { entity: self.id, type_name: n, world: self.world.clone() })))
+                Ok(Value::Host(Rc::new(ComponentRef::new(self.id, &n, &self.world))))
             })(),
             "remove_component" => (|| {
                 argc(1)?;
@@ -627,9 +635,53 @@ pub struct ComponentRef {
     pub entity: EntityId,
     pub type_name: String,
     pub world: WorldRef,
+    /// When set, only these fields are visible (e.g. `entity.material` shows the
+    /// material part of the MeshRenderer).
+    pub only: Option<&'static [&'static str]>,
+    /// Name scripts see (`MeshRenderer`, or `Material` for the material view).
+    pub label: String,
 }
 
 impl ComponentRef {
+    pub fn new(entity: EntityId, type_name: &str, world: &WorldRef) -> ComponentRef {
+        ComponentRef { entity, type_name: type_name.into(), world: world.clone(), only: None, label: type_name.into() }
+    }
+
+    pub fn material(entity: EntityId, world: &WorldRef) -> ComponentRef {
+        ComponentRef {
+            entity,
+            type_name: "MeshRenderer".into(),
+            world: world.clone(),
+            only: Some(grodot_core::scene::MATERIAL_FIELDS),
+            label: "Material".into(),
+        }
+    }
+
+    fn visible_field(&self, name: &str) -> bool {
+        self.only.map(|o| o.contains(&name)).unwrap_or(true)
+    }
+
+    /// Check a texture path when a script assigns it, so the error points at that line.
+    fn check_texture(&self, value: &Value) -> GroResult<()> {
+        let path = match value {
+            Value::Str(s) if !s.trim().is_empty() => s.trim().to_string(),
+            Value::Host(h) => match h.as_any().downcast_ref::<Resource>() {
+                Some(r) => r.path.clone(),
+                None => return Ok(()),
+            },
+            _ => return Ok(()),
+        };
+        let lower = path.to_lowercase();
+        if !(lower.ends_with(".png") || lower.ends_with(".bmp")) {
+            return engine_err(format!("texture '{}' must be a .png or .bmp file", path));
+        }
+        let full = self.world.borrow().resolve(&path).map_err(|e| GroError::new(ErrorKind::Engine, e))?;
+        if !full.is_file() {
+            return engine_err(format!("texture '{}' not found (textures usually live in assets/textures/)", path));
+        }
+        Ok(())
+    }
+
     fn missing(&self) -> GroError {
         GroError::new(
             ErrorKind::Engine,
@@ -640,7 +692,7 @@ impl ComponentRef {
 
 impl HostObject for ComponentRef {
     fn type_name(&self) -> String {
-        self.type_name.clone()
+        self.label.clone()
     }
     fn identity(&self) -> u64 {
         self.entity
@@ -649,7 +701,7 @@ impl HostObject for ComponentRef {
         self
     }
     fn describe(&self) -> String {
-        format!("#<{} on entity {}>", self.type_name, self.entity)
+        format!("#<{} on entity {}>", self.label, self.entity)
     }
 
     fn get_property(&self, name: &str) -> Option<GroResult<Value>> {
@@ -661,10 +713,27 @@ impl HostObject for ComponentRef {
             Some(c) => c,
             None => return Some(Err(self.missing())),
         };
-        comp.fields().into_iter().find(|(n, _)| *n == name).map(|(_, v)| Ok(field_to_value(v)))
+        if !self.visible_field(name) {
+            return None;
+        }
+        comp.fields().into_iter().find(|(n, _)| *n == name).map(|(_, v)| {
+            Ok(match (name, v) {
+                // An unset texture reads as nil rather than "".
+                ("texture", FieldValue::Text(t)) if t.is_empty() => Value::Nil,
+                (_, v) => field_to_value(v),
+            })
+        })
     }
 
     fn set_property(&self, name: &str, value: Value) -> Option<GroResult<()>> {
+        if !self.visible_field(name) {
+            return None;
+        }
+        if name == "texture" {
+            if let Err(e) = self.check_texture(&value) {
+                return Some(Err(e));
+            }
+        }
         let mut w = self.world.borrow_mut();
         let comp = match w.scene.entity_mut(self.entity).and_then(|e| e.get_mut(&self.type_name)) {
             Some(c) => c,
@@ -682,7 +751,13 @@ impl HostObject for ComponentRef {
             "fields" => {
                 let w = self.world.borrow();
                 let comp = w.scene.entity(self.entity).and_then(|e| e.get(&self.type_name))?;
-                Some(Ok(Value::array(comp.fields().into_iter().map(|(n, _)| Value::str(n)).collect())))
+                Some(Ok(Value::array(
+                    comp.fields()
+                        .into_iter()
+                        .filter(|(n, _)| self.visible_field(n))
+                        .map(|(n, _)| Value::str(n))
+                        .collect(),
+                )))
             }
             _ => None,
         }

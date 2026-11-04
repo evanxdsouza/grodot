@@ -1,0 +1,63 @@
+{
+  "scene_version": 1,
+  "name": "Textured Demo",
+  "environment": {"background": "#7aa7d9", "ambient": 0.5},
+  "entities": [
+    {"id": 1, "name": "Camera", "parent": null, "active": true, "tag": "", "components": [
+      {"type": "Transform", "position": [0, 4.2, 10], "rotation_degrees": [-18, 0, 0], "scale": [1, 1, 1]},
+      {"type": "Camera", "fov": 60, "near": 0.1, "far": 200, "active": true}]},
+    {"id": 2, "name": "Sun", "parent": null, "active": true, "tag": "", "components": [
+      {"type": "Transform", "position": [0, 10, 0], "rotation_degrees": [-50, 35, 0], "scale": [1, 1, 1]},
+      {"type": "Light", "color": "#fff3dc", "intensity": 1.0}]},
+    {"id": 3, "name": "Ground", "parent": null, "active": true, "tag": "", "components": [
+      {"type": "Transform", "position": [0, 0, -10], "rotation_degrees": [0, 0, 0], "scale": [40, 1, 60]},
+      {"type": "MeshRenderer", "mesh": "plane", "lit": true, "visible": true,
+       "material": {"base_color": "#ffffff", "texture": "assets/textures/grass.png", "uv_scale": [16, 24]}},
+      {"type": "Collider", "shape": "box", "size": [1, 0.01, 1]}]},
+    {"id": 4, "name": "Crate", "parent": null, "active": true, "tag": "", "components": [
+      {"type": "Transform", "position": [-2.6, 0.75, 0.5], "rotation_degrees": [0, 20, 0], "scale": [1.5, 1.5, 1.5]},
+      {"type": "MeshRenderer", "mesh": "cube", "lit": true, "visible": true,
+       "material": {"base_color": "#ffffff", "texture": "assets/textures/crate.png"}},
+      {"type": "Script", "path": "scripts/spinner.gro", "enabled": true}]},
+    {"id": 5, "name": "Fern", "parent": null, "active": true, "tag": "", "components": [
+      {"type": "Transform", "position": [1.4, 0.7, 1.8], "rotation_degrees": [0, 30, 0], "scale": [1.4, 1.4, 1]},
+      {"type": "MeshRenderer", "mesh": "quad", "lit": true, "visible": true,
+       "material": {"base_color": "#ffffff", "texture": "assets/textures/fern.png", "wrap": "clamp",
+                    "alpha_mode": "cutout", "alpha_cutoff": 0.5, "double_sided": true}}]},
+    {"id": 6, "name": "Fern Cross", "parent": 5, "active": true, "tag": "", "components": [
+      {"type": "Transform", "position": [0, 0, 0], "rotation_degrees": [0, 90, 0], "scale": [1, 1, 1]},
+      {"type": "MeshRenderer", "mesh": "quad", "lit": true, "visible": true,
+       "material": {"base_color": "#ffffff", "texture": "assets/textures/fern.png", "wrap": "clamp",
+                    "alpha_mode": "cutout", "alpha_cutoff": 0.5, "double_sided": true}}]},
+    {"id": 7, "name": "Fern 2", "parent": null, "active": true, "tag": "", "components": [
+      {"type": "Transform", "position": [-0.6, 0.55, 3.2], "rotation_degrees": [0, -15, 0], "scale": [1.1, 1.1, 1]},
+      {"type": "MeshRenderer", "mesh": "quad", "lit": true, "visible": true,
+       "material": {"base_color": "#e8ffe0", "texture": "assets/textures/fern.png", "wrap": "clamp",
+                    "alpha_mode": "cutout", "alpha_cutoff": 0.5, "double_sided": true}}]},
+    {"id": 8, "name": "Pond", "parent": null, "active": true, "tag": "", "components": [
+      {"type": "Transform", "position": [3.2, 0.03, -1.5], "rotation_degrees": [0, 0, 0], "scale": [5, 1, 4]},
+      {"type": "MeshRenderer", "mesh": "plane", "lit": true, "visible": true,
+       "material": {"base_color": "#ffffff", "texture": "assets/textures/water.png", "uv_scale": [2.5, 2],
+                    "alpha_mode": "blend"}},
+      {"type": "Script", "path": "scripts/water.gro", "enabled": true}]},
+    {"id": 9, "name": "Pond Bed", "parent": null, "active": true, "tag": "", "components": [
+      {"type": "Transform", "position": [3.2, 0.01, -1.5], "rotation_degrees": [0, 0, 0], "scale": [5.4, 1, 4.4]},
+      {"type": "MeshRenderer", "mesh": "plane", "lit": true, "visible": true,
+       "material": {"base_color": "#8a7a62", "texture": "assets/textures/stone.png", "uv_scale": [3, 2.5]}}]},
+    {"id": 10, "name": "Pillar", "parent": null, "active": true, "tag": "", "components": [
+      {"type": "Transform", "position": [-5.5, 1.75, -3], "rotation_degrees": [0, 0, 0], "scale": [1.2, 3.5, 1.2]},
+      {"type": "MeshRenderer", "mesh": "cylinder", "lit": true, "visible": true,
+       "material": {"base_color": "#ffffff", "texture": "assets/textures/stone.png", "uv_scale": [3, 2]}},
+      {"type": "Script", "path": "scripts/texture_swap.gro", "enabled": true}]},
+    {"id": 11, "name": "Checker Path", "parent": null, "active": true, "tag": "", "components": [
+      {"type": "Transform", "position": [0, 0.015, -22], "rotation_degrees": [0, 0, 0], "scale": [3, 1, 30]},
+      {"type": "MeshRenderer", "mesh": "plane", "lit": true, "visible": true,
+       "material": {"base_color": "#ffffff", "texture": "assets/textures/checker.png", "uv_scale": [2, 20],
+                    "filter": "trilinear"}}]},
+    {"id": 12, "name": "Ball", "parent": null, "active": true, "tag": "", "components": [
+      {"type": "Transform", "position": [5.5, 0.8, 2], "rotation_degrees": [0, 0, 0], "scale": [1.6, 1.6, 1.6]},
+      {"type": "MeshRenderer", "mesh": "sphere", "lit": true, "visible": true,
+       "material": {"base_color": "#ffd9a0", "texture": "assets/textures/checker.png", "uv_scale": [4, 2],
+                    "filter": "nearest"}}]}
+  ]
+}
