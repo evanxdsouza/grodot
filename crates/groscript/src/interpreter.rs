@@ -409,6 +409,41 @@ impl Interpreter {
             StmtKind::Class { name, parent, body } => self.declare_class(name, parent, body, stmt.span)?,
             StmtKind::Module { name, body } => self.declare_module(name, body)?,
             StmtKind::Import(path) => self.import(path, stmt.span)?,
+            StmtKind::Enum { name, members } => {
+                let module = Module::new(name);
+                let mut next = 0.0;
+                for (m, value) in members {
+                    let n = match value {
+                        Some(e) => match self.eval(e)? {
+                            Value::Number(n) => n,
+                            other => {
+                                return rt(
+                                    ErrorKind::Type,
+                                    format!("enum value for {}.{} must be a Number, got {}", name, m, other.type_name()),
+                                )
+                            }
+                        },
+                        None => next,
+                    };
+                    next = n + 1.0;
+                    module.set(m, Value::Number(n));
+                }
+                self.globals.insert(name.clone(), Value::Module(module));
+            }
+            StmtKind::Match { subject, arms, else_body } => {
+                let v = self.eval(subject)?;
+                for arm in arms {
+                    for pat in &arm.patterns {
+                        let p = self.eval(pat)?;
+                        if crate::value::values_equal(&v, &p) {
+                            return self.exec_block(&arm.body);
+                        }
+                    }
+                }
+                if let Some(b) = else_body {
+                    self.exec_block(b)?;
+                }
+            }
         }
         Ok(())
     }

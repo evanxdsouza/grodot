@@ -122,5 +122,15 @@ pub enum StmtKind {
     Function(Rc<FunctionDecl>),
     Class { name: Rc<str>, parent: Option<Rc<str>>, body: Vec<Stmt> },
     Module { name: Rc<str>, body: Vec<Stmt> },
+    /// `enum Name ... end`: members are (name, optional explicit value).
+    Enum { name: Rc<str>, members: Vec<(Rc<str>, Option<Expr>)> },
+    /// `match subject when a, b ... else ... end`
+    Match { subject: Expr, arms: Vec<MatchArm>, else_body: Option<Vec<Stmt>> },
     Import(String),
+}
+
+#[derive(Debug, Clone)]
+pub struct MatchArm {
+    pub patterns: Vec<Expr>,
+    pub body: Vec<Stmt>,
 }

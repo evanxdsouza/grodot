@@ -25,7 +25,7 @@ tests in `tests/language/` or the unit tests in `crates/groscript`.
   Strings cannot span lines.
 * **Symbols**: `:idle`, `:jump`.
 * **Keywords**: `function class module import if elsif else while for in
-  repeat times return break next end true false nil self super and or not`.
+  repeat times return break next end true false nil self super and or not enum match when`.
 * Operators use longest match: `** += -= *= /= == != <= >= && ||`.
 
 ## 2. Values
@@ -108,6 +108,43 @@ end
   without `return` returns `nil` (no implicit return).
 * Every block closes with `end`. A missing `end` reports the line of the
   block that opened it.
+
+### 4.1 `match`
+
+```ruby
+match state
+  when State.IDLE
+    idle()
+  when State.RUN, State.FALL
+    move()
+  else
+    fallback()
+end
+```
+
+* Each `when` lists one or more expressions separated by commas; the first arm
+  with a pattern `==` the subject (same rules as section 2) runs. There is no
+  fall-through, and `else` is optional and must be last.
+* `break`/`next` inside an arm act on the enclosing loop.
+* Not yet supported (GDScript has them): binding patterns, array/dictionary
+  patterns, guards.
+
+### 4.2 `enum`
+
+```ruby
+enum State
+  IDLE        # 0
+  RUN         # 1
+  JUMP = 10
+  FALL        # 11
+end
+State.JUMP
+```
+
+An enum is declared at the top level of a file and defines a module of Number
+constants. Members auto-increment from the previous value (start 0); explicit
+values must be Numbers. Duplicate members are a SyntaxError. `enum`, `match`
+and `when` are now reserved words.
 
 ## 5. Variables and scope
 

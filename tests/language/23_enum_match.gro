@@ -1,0 +1,39 @@
+enum State
+  IDLE
+  RUN
+  JUMP = 10
+  FALL
+end
+
+function describe(s)
+  match s
+    when State.IDLE
+      return "idle"
+    when State.RUN, State.FALL
+      return "moving"
+    when State.JUMP
+      return "airborne"
+    else
+      return "unknown"
+  end
+end
+
+print(State.IDLE)
+print(State.RUN)
+print(State.JUMP)
+print(State.FALL)
+print(describe(State.RUN))
+print(describe(State.JUMP))
+print(describe(State.FALL))
+print(describe(99))
+
+for word in ["a", "b", :c, nil]
+  match word
+    when "a"
+      print("letter a")
+    when "b", :c
+      print("b or symbol c")
+    else
+      print("other")
+  end
+end

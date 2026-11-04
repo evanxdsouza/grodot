@@ -118,7 +118,7 @@ impl Parser {
                 }
             }
             self.skip_newlines();
-            if matches!(self.peek(), Tok::End | Tok::Elsif | Tok::Else) {
+            if matches!(self.peek(), Tok::End | Tok::Elsif | Tok::Else | Tok::When) {
                 let sp = self.span();
                 self.errors.push(syntax(format!("unexpected {} with no open block", self.peek().describe()), sp));
                 self.advance();
@@ -138,7 +138,7 @@ impl Parser {
         self.skip_newlines();
         loop {
             match self.peek() {
-                Tok::End | Tok::Elsif | Tok::Else => break,
+                Tok::End | Tok::Elsif | Tok::Else | Tok::When => break,
                 Tok::Eof => {
                     return Err(syntax(
                         format!("missing 'end' for '{}' opened at line {}", opener, open_span.line),
@@ -238,6 +238,13 @@ impl Parser {
                 Ok(Stmt { kind: StmtKind::Import(path), span })
             }
             Tok::If => self.if_stmt(),
+            Tok::Enum => {
+                if ctx != Ctx::TopLevel {
+                    return Err(syntax("enums can only be declared at the top level of a file", span));
+                }
+                self.enum_decl()
+            }
+            Tok::Match => self.match_stmt(),
             Tok::While => {
                 self.advance();
                 let cond = self.expression()?;
@@ -427,6 +434,86 @@ impl Parser {
         let body = body?;
         self.expect_end("class", span)?;
         Ok(Stmt { kind: StmtKind::Class { name, parent, body }, span })
+    }
+
+    fn enum_decl(&mut self) -> PResult<Stmt> {
+        let span = self.advance().span;
+        let name = self.const_name("enum")?;
+        self.expect_line_end()?;
+        self.skip_newlines();
+        let mut members: Vec<(Rc<str>, Option<Expr>)> = Vec::new();
+        loop {
+            match self.peek().clone() {
+                Tok::End => break,
+                Tok::Eof => {
+                    return Err(syntax(
+                        format!("missing 'end' for 'enum' opened at line {}", span.line),
+                        span,
+                    ))
+                }
+                Tok::Const(m) => {
+                    let msp = self.advance().span;
+                    if members.iter().any(|(n, _)| **n == *m) {
+                        return Err(syntax(format!("duplicate enum member '{}'", m), msp));
+                    }
+                    let value = if self.eat(&Tok::Eq) { Some(self.expression()?) } else { None };
+                    // Members may be separated by commas or newlines.
+                    self.eat(&Tok::Comma);
+                    if !self.check(&Tok::End) {
+                        self.expect_line_end()?;
+                    }
+                    members.push((m.into(), value));
+                }
+                other => {
+                    return Err(syntax(
+                        format!("expected an enum member (like IDLE or RUN = 5) but found {}", other.describe()),
+                        self.span(),
+                    ))
+                }
+            }
+            self.skip_newlines();
+        }
+        self.expect_end("enum", span)?;
+        Ok(Stmt { kind: StmtKind::Enum { name, members }, span })
+    }
+
+    fn match_stmt(&mut self) -> PResult<Stmt> {
+        let span = self.advance().span;
+        let subject = self.expression()?;
+        self.expect_line_end()?;
+        self.skip_newlines();
+        let mut arms = Vec::new();
+        let mut else_body = None;
+        loop {
+            if self.check(&Tok::When) {
+                if else_body.is_some() {
+                    return Err(syntax("'else' must be the last branch of a 'match'", self.span()));
+                }
+                self.advance();
+                let mut patterns = vec![self.expression()?];
+                while self.eat(&Tok::Comma) {
+                    self.skip_newlines();
+                    patterns.push(self.expression()?);
+                }
+                self.expect_line_end()?;
+                let body = self.block("match", span)?;
+                arms.push(MatchArm { patterns, body });
+            } else if self.check(&Tok::Else) {
+                if else_body.is_some() {
+                    return Err(syntax("a 'match' can have only one 'else'", self.span()));
+                }
+                self.advance();
+                self.expect_line_end()?;
+                else_body = Some(self.block("match", span)?);
+            } else {
+                break;
+            }
+        }
+        if arms.is_empty() && else_body.is_none() {
+            return Err(syntax("'match' needs at least one 'when' branch", span));
+        }
+        self.expect_end("match", span)?;
+        Ok(Stmt { kind: StmtKind::Match { subject, arms, else_body }, span })
     }
 
     fn module_decl(&mut self) -> PResult<Stmt> {
