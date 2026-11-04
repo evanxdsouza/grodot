@@ -224,6 +224,12 @@ impl Runtime {
         }
         let dt = dt.clamp(0.0, 0.1);
         self.world.borrow_mut().poll_gamepad();
+        let paused = {
+            let mut guard = self.world.borrow_mut();
+            let w: &mut World = &mut guard;
+            w.ui.begin_frame(&w.input);
+            w.paused
+        };
         let fixed = {
             let mut w = self.world.borrow_mut();
             w.time.delta = dt;
@@ -241,6 +247,9 @@ impl Runtime {
 
         // Fixed-step physics and fixed_update.
         self.accumulator += dt;
+        if paused {
+            self.accumulator = 0.0;
+        }
         let mut steps = 0;
         while self.accumulator >= fixed && steps < MAX_FIXED_STEPS {
             physics::step(&mut self.world.borrow_mut(), fixed);
@@ -258,9 +267,11 @@ impl Runtime {
         for i in 0..self.scripts.len() {
             self.call(i, "update", vec![Value::Number(dt as f64)]);
         }
-        self.run_timers();
-        self.advance_animations(dt);
-        crate::particles::advance_all(&mut self.world.borrow_mut(), dt);
+        if !paused {
+            self.run_timers();
+            self.advance_animations(dt);
+            crate::particles::advance_all(&mut self.world.borrow_mut(), dt);
+        }
         self.dispatch_signals();
         self.process_destroys();
         self.process_scene_load();
@@ -439,6 +450,8 @@ impl Runtime {
             w.animations.clear();
             w.poses.clear();
             w.emitters.clear();
+            w.ui.reset();
+            w.paused = false;
             w.particle_bursts.clear();
         }
         self.timers.borrow_mut().list.clear();

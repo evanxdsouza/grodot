@@ -231,6 +231,10 @@ pub struct World {
     pub time: TimeState,
     pub log: Log,
     pub hud: Hud,
+    /// Immediate-mode widgets for this frame (menus, buttons, focus).
+    pub ui: crate::ui::UiState,
+    /// `Game.pause()`: physics, timers, animations and particles stop; scripts keep running.
+    pub paused: bool,
     pub debug_lines: Vec<(Vec3, Vec3, Color)>,
     pub audio_cmds: Vec<AudioCmd>,
     pub pending_destroy: Vec<EntityId>,
@@ -273,6 +277,8 @@ impl World {
             time: TimeState::default(),
             log: Log::default(),
             hud: Hud::default(),
+            ui: Default::default(),
+            paused: false,
             debug_lines: Vec::new(),
             audio_cmds: Vec::new(),
             pending_destroy: Vec::new(),

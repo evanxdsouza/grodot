@@ -119,3 +119,10 @@ fn particles_demo_matches_golden_image() {
     let canvas = render_example("particles-demo", 40, 640, 360);
     check_golden("particles-demo", &canvas);
 }
+
+#[test]
+fn ui_demo_menu_matches_golden_image() {
+    // 1280x720 because the menu is laid out in game-area pixels.
+    let canvas = render_example("ui-demo", 30, 1280, 720);
+    check_golden("ui-demo", &canvas);
+}

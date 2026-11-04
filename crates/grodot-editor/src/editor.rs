@@ -319,6 +319,7 @@ impl Editor {
 
         // Game input and simulation
         let mut reload_note: Option<String> = None;
+        let play_vp = self.layout().3;
         if let Some(rt) = &mut self.play {
             // Hot reload: changed scripts, textures and models apply without restarting play.
             let reloaded = rt.hot_reload();
@@ -348,8 +349,11 @@ impl Editor {
                         }
                     }
                 }
-                w.input.mouse_position = self.ui.input.mouse;
+                // Widgets and clicks are relative to the viewport, like the drawn game.
+                let m = self.ui.input.mouse;
+                w.input.mouse_position = (m.0 - play_vp.x as f32, m.1 - play_vp.y as f32);
                 w.input.mouse_delta = self.ui.input.mouse_delta;
+                w.ui.screen = (play_vp.w as f32, play_vp.h as f32);
             }
             rt.frame(dt);
             let cmds: Vec<AudioCmd> = std::mem::take(&mut rt.world.borrow_mut().audio_cmds);
@@ -806,6 +810,7 @@ impl Editor {
             self.renderer.render_ex(&mut self.ui.canvas, vp, &w.scene, &view, &opts, &extras);
             hud::draw_debug_lines(&mut self.ui.canvas, vp, &view, &w);
             hud::draw_hud(&mut self.ui.canvas, vp, &w);
+            hud::draw_ui(&mut self.ui.canvas, vp, &w.ui, &mut self.renderer);
             if SceneRenderer::camera_view(&w.scene, vp).is_none() {
                 self.ui.canvas.text_shadow(
                     vp.x + 12,

@@ -32,6 +32,7 @@ pub fn render_game(canvas: &mut Canvas, renderer: &mut SceneRenderer, rt: &Runti
         }
     }
     hud::draw_hud(canvas, area, &w);
+    hud::draw_ui(canvas, area, &w.ui, renderer);
 }
 
 fn forward_logs(rt: &Runtime, verbose: bool) {
@@ -91,6 +92,7 @@ pub fn run_game(project: &Project) -> Result<(), String> {
         }
         let dt = last.elapsed().as_secs_f32();
         last = Instant::now();
+        rt.world.borrow_mut().ui.screen = (canvas.width as f32, canvas.height as f32);
         rt.frame(dt);
         if let Some(a) = &mut audio {
             let cmds: Vec<AudioCmd> = std::mem::take(&mut rt.world.borrow_mut().audio_cmds);
@@ -147,6 +149,7 @@ pub fn run_headless(
 ) -> Result<usize, String> {
     let mut rt = Runtime::from_project(project)?;
     rt.start();
+    rt.world.borrow_mut().ui.screen = (project.config.window_width as f32, project.config.window_height as f32);
     let mut errors = 0;
     let count_errors =
         |rt: &Runtime| rt.world.borrow().log.entries.iter().filter(|e| e.level == LogLevel::Error).count();

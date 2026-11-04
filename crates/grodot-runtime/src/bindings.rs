@@ -1469,6 +1469,85 @@ pub fn install(interp: &mut Interpreter, world: &WorldRef, timers: &Rc<RefCell<T
             Ok(Value::Nil)
         });
     }
+    // Immediate-mode widgets: call these from update() every frame.
+    {
+        let w = world.clone();
+        ui.native("button", 5, Some(5), move |_, a| {
+            let label = str_arg(a, 0, "UI.button")?;
+            let [x, y, bw, bh] = [1, 2, 3, 4].map(|i| num_arg(a, i, "UI.button").map(|n| n as f32));
+            let (x, y, bw, bh) = (x?, y?, bw?, bh?);
+            let mut guard = w.borrow_mut();
+            let wb: &mut World = &mut guard;
+            Ok(Value::Bool(wb.ui.button(&wb.input, &label, x, y, bw, bh)))
+        });
+        let w = world.clone();
+        ui.native("panel", 4, Some(4), move |_, a| {
+            let [x, y, pw, ph] = [0, 1, 2, 3].map(|i| num_arg(a, i, "UI.panel").map(|n| n as f32));
+            w.borrow_mut().ui.commands.push(crate::ui::Cmd::Panel { x: x?, y: y?, w: pw?, h: ph? });
+            Ok(Value::Nil)
+        });
+        let w = world.clone();
+        ui.native("label", 3, Some(4), move |_, a| {
+            let text = a[0].to_display();
+            let x = num_arg(a, 1, "UI.label")? as f32;
+            let y = num_arg(a, 2, "UI.label")? as f32;
+            let large = match a.get(3) {
+                None | Some(Value::Nil) => false,
+                Some(Value::Bool(b)) => *b,
+                Some(other) => {
+                    return Err(GroError::new(
+                        ErrorKind::Type,
+                        format!("UI.label's 4th argument is large: true or false, got {}", other.type_name()),
+                    ))
+                }
+            };
+            w.borrow_mut().ui.commands.push(crate::ui::Cmd::Label { x, y, text, color: 0xffffff, large });
+            Ok(Value::Nil)
+        });
+        let w = world.clone();
+        ui.native("image", 5, Some(6), move |_, a| {
+            let path = path_arg(a, 0, "UI.image")?;
+            let [x, y, iw, ih] = [1, 2, 3, 4].map(|i| num_arg(a, i, "UI.image").map(|n| n as f32));
+            let border = match a.get(5) {
+                None | Some(Value::Nil) => 0.0,
+                Some(_) => num_arg(a, 5, "UI.image")? as f32,
+            };
+            let full = w.borrow().resolve(&path).map_err(|e| GroError::new(ErrorKind::Engine, e))?;
+            if !full.is_file() {
+                return engine_err(format!("image '{}' not found (images usually live in assets/textures/)", path));
+            }
+            if !(path.to_lowercase().ends_with(".png") || path.to_lowercase().ends_with(".bmp")) {
+                return engine_err(format!("UI image '{}' must be a .png or .bmp file", path));
+            }
+            w.borrow_mut().ui.commands.push(crate::ui::Cmd::Image { x: x?, y: y?, w: iw?, h: ih?, path, border });
+            Ok(Value::Nil)
+        });
+        let w = world.clone();
+        ui.native("skin", 1, Some(2), move |_, a| {
+            let skin = match a.first() {
+                None | Some(Value::Nil) => None,
+                Some(_) => {
+                    let path = path_arg(a, 0, "UI.skin")?;
+                    let border = match a.get(1) {
+                        None | Some(Value::Nil) => 8.0,
+                        Some(_) => num_arg(a, 1, "UI.skin")? as f32,
+                    };
+                    let full = w.borrow().resolve(&path).map_err(|e| GroError::new(ErrorKind::Engine, e))?;
+                    if !full.is_file() {
+                        return engine_err(format!("skin '{}' not found (skins are .png images)", path));
+                    }
+                    Some(crate::ui::Skin { path, border: border.max(0.0) })
+                }
+            };
+            w.borrow_mut().ui.skin = skin;
+            Ok(Value::Nil)
+        });
+        let w = world.clone();
+        ui.native("screen_size", 0, Some(0), move |_, _| {
+            let (sw, sh) = w.borrow().ui.screen_size();
+            Ok(Value::Vec2(V2 { x: sw as f64, y: sh as f64 }))
+        });
+    }
     interp.add_module(ui);
 
     // ---- Game
@@ -1479,6 +1558,18 @@ pub fn install(interp: &mut Interpreter, world: &WorldRef, timers: &Rc<RefCell<T
             w.borrow_mut().quit_requested = true;
             Ok(Value::Nil)
         });
+        let w = world.clone();
+        game.native("pause", 0, Some(0), move |_, _| {
+            w.borrow_mut().paused = true;
+            Ok(Value::Nil)
+        });
+        let w = world.clone();
+        game.native("resume", 0, Some(0), move |_, _| {
+            w.borrow_mut().paused = false;
+            Ok(Value::Nil)
+        });
+        let w = world.clone();
+        game.native("paused?", 0, Some(0), move |_, _| Ok(Value::Bool(w.borrow().paused)));
     }
     interp.add_module(game);
 }

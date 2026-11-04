@@ -1,0 +1,8 @@
+# Turns the crate. Stops while the game is paused (Game.paused?).
+class Spinner < Entity
+  function update(delta)
+    if not Game.paused?()
+      self.rotate(Vector3.new(0, 45 * delta, 0))
+    end
+  end
+end

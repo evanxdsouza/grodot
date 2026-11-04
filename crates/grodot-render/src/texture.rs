@@ -153,6 +153,65 @@ pub fn draw_texture(canvas: &mut crate::canvas::Canvas, r: crate::canvas::Rect, 
     }
 }
 
+/// Draw the part of a texture between `uv0` and `uv1` (0..1, `[u, v]`) scaled into `r`.
+pub fn draw_texture_uv(
+    canvas: &mut crate::canvas::Canvas,
+    r: crate::canvas::Rect,
+    tex: &Texture,
+    uv0: [f32; 2],
+    uv1: [f32; 2],
+) {
+    if r.w <= 0 || r.h <= 0 {
+        return;
+    }
+    let (du, dv) = (uv1[0] - uv0[0], uv1[1] - uv0[1]);
+    let scale = ((tex.width() as f32 * du) / r.w as f32).max((tex.height() as f32 * dv) / r.h as f32);
+    let lod = scale.max(1.0).log2();
+    for y in 0..r.h {
+        for x in 0..r.w {
+            let u = uv0[0] + du * (x as f32 + 0.5) / r.w as f32;
+            let v = uv0[1] + dv * (y as f32 + 0.5) / r.h as f32;
+            let c = tex.sample(u, v, lod, TextureFilter::Bilinear, TextureWrap::Clamp);
+            let rgb = ((c[0] * 255.0) as u32) << 16 | ((c[1] * 255.0) as u32) << 8 | (c[2] * 255.0) as u32;
+            canvas.put(r.x + x, r.y + y, rgb, (c[3] * 255.0) as u32);
+        }
+    }
+}
+
+/// Draw a texture stretched into `r` as a nine-slice: the corners keep their
+/// size (`border` texels, or pixels on screen) and the edges and middle stretch.
+pub fn draw_nine_slice(canvas: &mut crate::canvas::Canvas, r: crate::canvas::Rect, tex: &Texture, border: i32) {
+    if r.w <= 0 || r.h <= 0 {
+        return;
+    }
+    let (tw, th) = (tex.width() as f32, tex.height() as f32);
+    let b = border.max(0) as f32;
+    // Corners cannot overlap, even in a small panel.
+    let bx = b.min(r.w as f32 / 2.0);
+    let by = b.min(r.h as f32 / 2.0);
+    let bu = b.min(tw / 2.0);
+    let bv = b.min(th / 2.0);
+    let xs_src = [0.0, bu, tw - bu, tw];
+    let ys_src = [0.0, bv, th - bv, th];
+    let xs_dst = [0.0, bx, r.w as f32 - bx, r.w as f32];
+    let ys_dst = [0.0, by, r.h as f32 - by, r.h as f32];
+    for row in 0..3 {
+        for col in 0..3 {
+            let x0 = xs_dst[col].round() as i32;
+            let x1 = xs_dst[col + 1].round() as i32;
+            let y0 = ys_dst[row].round() as i32;
+            let y1 = ys_dst[row + 1].round() as i32;
+            if x1 <= x0 || y1 <= y0 {
+                continue;
+            }
+            let dest = crate::canvas::Rect::new(r.x + x0, r.y + y0, x1 - x0, y1 - y0);
+            let uv0 = [xs_src[col] / tw, ys_src[row] / th];
+            let uv1 = [xs_src[col + 1] / tw, ys_src[row + 1] / th];
+            draw_texture_uv(canvas, dest, tex, uv0, uv1);
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

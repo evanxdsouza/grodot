@@ -11,6 +11,7 @@ pub mod gamepad;
 pub mod particles;
 pub mod physics;
 pub mod runtime;
+pub mod ui;
 pub mod world;
 
 pub use runtime::{load_scene_file, Reloaded, Runtime};

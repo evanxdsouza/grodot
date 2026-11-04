@@ -1,0 +1,150 @@
+{
+ "scene_version": 1,
+ "name": "Menu",
+ "environment": {
+  "background": "#1c2a44",
+  "ambient": 0.45
+ },
+ "entities": [
+  {
+   "id": 1,
+   "name": "Camera",
+   "parent": null,
+   "active": true,
+   "tag": "",
+   "components": [
+    {
+     "type": "Transform",
+     "position": [
+      0,
+      1.2,
+      5
+     ],
+     "rotation_degrees": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    {
+     "type": "Camera",
+     "fov": 55,
+     "near": 0.1,
+     "far": 100,
+     "active": true
+    }
+   ]
+  },
+  {
+   "id": 2,
+   "name": "Sun",
+   "parent": null,
+   "active": true,
+   "tag": "",
+   "components": [
+    {
+     "type": "Transform",
+     "position": [
+      0,
+      8,
+      0
+     ],
+     "rotation_degrees": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    {
+     "type": "Light",
+     "light_type": "directional",
+     "color": "#fff1d6",
+     "intensity": 1.0
+    }
+   ]
+  },
+  {
+   "id": 3,
+   "name": "Crate",
+   "parent": null,
+   "active": true,
+   "tag": "",
+   "components": [
+    {
+     "type": "Transform",
+     "position": [
+      2.6,
+      0.8,
+      0
+     ],
+     "rotation_degrees": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1.5,
+      1.5,
+      1.5
+     ]
+    },
+    {
+     "type": "MeshRenderer",
+     "mesh": "cube",
+     "lit": true,
+     "visible": true,
+     "material": {
+      "base_color": "#b07a45"
+     }
+    },
+    {
+     "type": "Script",
+     "path": "scripts/spinner.gro",
+     "enabled": true
+    }
+   ]
+  },
+  {
+   "id": 4,
+   "name": "Menu",
+   "parent": null,
+   "active": true,
+   "tag": "",
+   "components": [
+    {
+     "type": "Transform",
+     "position": [
+      0,
+      0,
+      0
+     ],
+     "rotation_degrees": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    {
+     "type": "Script",
+     "path": "scripts/menu.gro",
+     "enabled": true
+    }
+   ]
+  }
+ ]
+}

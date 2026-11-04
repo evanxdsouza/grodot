@@ -1,0 +1,16 @@
+[project]
+name = "UI Demo"
+version = "0.1.0"
+engine = "grodot"
+config_version = 1
+
+[game]
+main_scene = "scenes/menu.gscene"
+
+[window]
+width = 1280
+height = 720
+title = "UI Demo - menu, game, pause"
+
+[input]
+pause = "Escape, PadStart"

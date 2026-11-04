@@ -37,6 +37,8 @@ jobs:
           ./target/release/grodot run examples/lighting-demo --headless --frames 120
           ./target/release/grodot check examples/particles-demo
           ./target/release/grodot run examples/particles-demo --headless --frames 120
+          ./target/release/grodot check examples/ui-demo
+          ./target/release/grodot run examples/ui-demo --headless --frames 120
           ./target/release/grodot run examples/orb-garden --headless --frames 600 --screenshot game.png
       - name: Create, check and run a new project
         run: |

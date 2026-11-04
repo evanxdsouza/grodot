@@ -1,0 +1,35 @@
+# The game level. Escape (or Start on a pad) opens the pause menu, which
+# stops physics, timers and animations through Game.pause().
+class Level < Entity
+  function update(delta)
+    if Input.just_pressed("pause")
+      if Game.paused?()
+        Game.resume()
+      else
+        Game.pause()
+      end
+    end
+    if Game.paused?()
+      pause_menu()
+    else
+      UI.label("Escape or Start: pause", 20, 20)
+    end
+  end
+
+  function pause_menu()
+    UI.skin("assets/ui/panel.png", 6)
+    size = UI.screen_size()
+    cx = size.x / 2
+    UI.panel(cx - 150, 180, 300, 270)
+    UI.label("Paused", cx - 40, 200, true)
+    if UI.button("Resume", cx - 110, 270, 220, 44)
+      Game.resume()
+    end
+    if UI.button("Main menu", cx - 110, 330, 220, 44)
+      Scene.load("scenes/menu.gscene")
+    end
+    if UI.button("Quit", cx - 110, 390, 220, 44)
+      Game.quit()
+    end
+  end
+end

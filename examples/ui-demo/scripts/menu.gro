@@ -1,0 +1,18 @@
+# The main menu. Play loads the game; Quit closes the window.
+# Choose with the arrow keys or the mouse; Enter (or pad A) selects.
+class Menu < Entity
+  function update(delta)
+    UI.skin("assets/ui/panel.png", 6)
+    size = UI.screen_size()
+    cx = size.x / 2
+    UI.panel(cx - 180, 150, 360, 330)
+    UI.label("Grodot UI Demo", cx - 135, 175, true)
+    if UI.button("Play", cx - 120, 250, 240, 48)
+      Scene.load("scenes/game.gscene")
+    end
+    if UI.button("Quit", cx - 120, 320, 240, 48)
+      Game.quit()
+    end
+    UI.label("Arrows or mouse, Enter to select", cx - 150, 410)
+  end
+end
