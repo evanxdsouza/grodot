@@ -675,6 +675,40 @@ impl ComponentRef {
         }
     }
 
+    /// Methods of a ParticleEmitter: start, stop, emit_burst(n), playing?, count.
+    fn particle_method(&self, name: &str, args: &[Value]) -> Option<GroResult<Value>> {
+        let set_playing = |on: bool| -> GroResult<Value> {
+            let mut w = self.world.borrow_mut();
+            match w.scene.entity_mut(self.entity).and_then(|e| e.get_mut("ParticleEmitter")) {
+                Some(Component::ParticleEmitter(p)) => {
+                    p.playing = on;
+                    Ok(Value::Nil)
+                }
+                _ => Err(self.missing()),
+            }
+        };
+        Some(match name {
+            "start" => set_playing(true),
+            "stop" => set_playing(false),
+            "playing?" => {
+                let w = self.world.borrow();
+                match w.scene.entity(self.entity).and_then(|e| e.get("ParticleEmitter")) {
+                    Some(Component::ParticleEmitter(p)) => Ok(Value::Bool(p.playing)),
+                    _ => Err(self.missing()),
+                }
+            }
+            "count" => Ok(Value::Number(crate::particles::live_count(&self.world.borrow(), self.entity) as f64)),
+            "emit_burst" => match args.first() {
+                Some(Value::Number(n)) if *n >= 0.0 && n.fract() == 0.0 && *n <= 10_000.0 => {
+                    crate::particles::queue_burst(&mut self.world.borrow_mut(), self.entity, *n as u32);
+                    Ok(Value::Nil)
+                }
+                _ => engine_err("emit_burst() needs a whole number of particles, e.g. emitter.emit_burst(40)"),
+            },
+            _ => return None,
+        })
+    }
+
     fn animation_method(&self, name: &str, args: &[Value]) -> Option<GroResult<Value>> {
         let (looping, speed, crossfade) = {
             let w = self.world.borrow();
@@ -879,6 +913,11 @@ impl HostObject for ComponentRef {
     fn call_method(&self, _interp: &mut Interpreter, name: &str, args: &[Value]) -> Option<GroResult<Value>> {
         if self.type_name == "AnimationPlayer" {
             if let Some(r) = self.animation_method(name, args) {
+                return Some(r);
+            }
+        }
+        if self.type_name == "ParticleEmitter" {
+            if let Some(r) = self.particle_method(name, args) {
                 return Some(r);
             }
         }

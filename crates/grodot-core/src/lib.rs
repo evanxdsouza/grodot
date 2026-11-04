@@ -9,6 +9,7 @@ pub mod inflate;
 pub mod json;
 pub mod math;
 pub mod mesh;
+pub mod particles;
 pub mod scene;
 
 pub use config::{Project, ProjectConfig};

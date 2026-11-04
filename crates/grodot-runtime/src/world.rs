@@ -255,6 +255,10 @@ pub struct World {
     pub animations: HashMap<EntityId, crate::animation::AnimState>,
     /// Current node-local matrices of each animated entity's model (for rendering).
     pub poses: HashMap<EntityId, Vec<grodot_core::math::Mat4>>,
+    /// Particle simulation state per emitter entity.
+    pub emitters: HashMap<EntityId, crate::particles::Emitter>,
+    /// Particles queued by `emit_burst`, spawned on the next frame.
+    pub particle_bursts: HashMap<EntityId, u32>,
     /// Scene file this world was loaded from (for Scene.reload()).
     pub scene_path: Option<String>,
 }
@@ -285,6 +289,8 @@ impl World {
             models: HashMap::new(),
             animations: HashMap::new(),
             poses: HashMap::new(),
+            emitters: HashMap::new(),
+            particle_bursts: HashMap::new(),
             scene_path: None,
         }
     }

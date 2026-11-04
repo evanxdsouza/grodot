@@ -112,3 +112,10 @@ fn lighting_demo_matches_golden_image() {
     let canvas = render_example("lighting-demo", 30, 640, 360);
     check_golden("lighting-demo", &canvas);
 }
+
+#[test]
+fn particles_demo_matches_golden_image() {
+    // 40 frames: the flames and sparks are in steady state (the explosion waits for E).
+    let canvas = render_example("particles-demo", 40, 640, 360);
+    check_golden("particles-demo", &canvas);
+}

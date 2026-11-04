@@ -489,6 +489,57 @@ pub struct AnimationPlayer {
     pub crossfade: f32,
 }
 
+/// Emits particles: simulated on the CPU, drawn as camera-facing quads that are
+/// sorted back to front. Particles fly in the emitter's up (+Y) direction, in
+/// world space, so a moving emitter leaves a trail.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ParticleEmitter {
+    /// Emitting now. Scripts change this with `start()` and `stop()`.
+    pub playing: bool,
+    /// Particles per second while playing.
+    pub rate: f32,
+    /// Most particles alive at once.
+    pub max_particles: u32,
+    /// Seconds a particle lives.
+    pub lifetime: f32,
+    /// 0..1: each particle's lifetime is shortened by up to this fraction.
+    pub lifetime_random: f32,
+    /// Initial speed in metres per second.
+    pub speed: f32,
+    /// Cone half-angle in degrees: 0 fires straight up.
+    pub spread: f32,
+    /// Acceleration in metres per second squared.
+    pub gravity: Vec3,
+    /// Quad size (metres) at birth and at death.
+    pub size_start: f32,
+    pub size_end: f32,
+    /// Colour and opacity at birth and at death (alpha is opacity).
+    pub color_start: Color,
+    pub color_end: Color,
+    /// Texture on each particle. Empty means a plain quad tinted by the colour.
+    pub texture: Option<String>,
+}
+
+impl Default for ParticleEmitter {
+    fn default() -> Self {
+        ParticleEmitter {
+            playing: true,
+            rate: 20.0,
+            max_particles: 128,
+            lifetime: 1.0,
+            lifetime_random: 0.2,
+            speed: 1.0,
+            spread: 15.0,
+            gravity: Vec3::ZERO,
+            size_start: 0.3,
+            size_end: 0.05,
+            color_start: Color::WHITE,
+            color_end: Color { r: 1.0, g: 1.0, b: 1.0, a: 0.0 },
+            texture: None,
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum Component {
     Transform(Transform),
@@ -503,10 +554,11 @@ pub enum Component {
     Light(Light),
     Skeleton(Skeleton),
     AnimationPlayer(AnimationPlayer),
+    ParticleEmitter(ParticleEmitter),
 }
 
 /// Every component type, in inspector order.
-pub const COMPONENT_TYPES: [&str; 12] = [
+pub const COMPONENT_TYPES: [&str; 13] = [
     "Transform",
     "Camera",
     "Camera2D",
@@ -519,6 +571,7 @@ pub const COMPONENT_TYPES: [&str; 12] = [
     "Light",
     "Skeleton",
     "AnimationPlayer",
+    "ParticleEmitter",
 ];
 
 pub const PRIMITIVE_MESHES: [&str; 6] = ["cube", "sphere", "plane", "quad", "cylinder", "capsule"];
@@ -550,6 +603,7 @@ impl Component {
             Component::Light(_) => "Light",
             Component::Skeleton(_) => "Skeleton",
             Component::AnimationPlayer(_) => "AnimationPlayer",
+            Component::ParticleEmitter(_) => "ParticleEmitter",
         }
     }
 
@@ -603,6 +657,7 @@ impl Component {
                 speed: 1.0,
                 crossfade: 0.2,
             }),
+            "ParticleEmitter" => Component::ParticleEmitter(ParticleEmitter::default()),
             _ => return None,
         })
     }
@@ -678,6 +733,21 @@ impl Component {
                 ("looping", F::Bool(a.looping)),
                 ("speed", F::Float(a.speed)),
                 ("crossfade", F::Float(a.crossfade)),
+            ],
+            Component::ParticleEmitter(p) => vec![
+                ("playing", F::Bool(p.playing)),
+                ("rate", F::Float(p.rate)),
+                ("max_particles", F::Float(p.max_particles as f32)),
+                ("lifetime", F::Float(p.lifetime)),
+                ("lifetime_random", F::Float(p.lifetime_random)),
+                ("speed", F::Float(p.speed)),
+                ("spread", F::Float(p.spread)),
+                ("gravity", F::Vec3(p.gravity)),
+                ("size_start", F::Float(p.size_start)),
+                ("size_end", F::Float(p.size_end)),
+                ("color_start", F::Color(p.color_start)),
+                ("color_end", F::Color(p.color_end)),
+                ("texture", F::Text(p.texture.clone().unwrap_or_default())),
             ],
         }
     }
@@ -900,6 +970,37 @@ impl Component {
             },
             (Component::AnimationPlayer(a), "speed") => a.speed = fnum?.clamp(-10.0, 10.0),
             (Component::AnimationPlayer(a), "crossfade") => a.crossfade = fnum?.clamp(0.0, 5.0),
+            (Component::ParticleEmitter(p), "playing") => match v {
+                F::Bool(b) => p.playing = b,
+                _ => return bad(),
+            },
+            (Component::ParticleEmitter(p), "rate") => p.rate = fnum?.clamp(0.0, 1000.0),
+            (Component::ParticleEmitter(p), "max_particles") => p.max_particles = fnum?.clamp(0.0, 4096.0) as u32,
+            (Component::ParticleEmitter(p), "lifetime") => p.lifetime = fnum?.clamp(0.01, 60.0),
+            (Component::ParticleEmitter(p), "lifetime_random") => p.lifetime_random = fnum?.clamp(0.0, 1.0),
+            (Component::ParticleEmitter(p), "speed") => p.speed = fnum?.clamp(0.0, 100.0),
+            (Component::ParticleEmitter(p), "spread") => p.spread = fnum?.clamp(0.0, 180.0),
+            (Component::ParticleEmitter(p), "gravity") => match v {
+                F::Vec3(g) => p.gravity = g,
+                _ => return bad(),
+            },
+            (Component::ParticleEmitter(p), "size_start") => p.size_start = fnum?.max(0.0),
+            (Component::ParticleEmitter(p), "size_end") => p.size_end = fnum?.max(0.0),
+            (Component::ParticleEmitter(p), "color_start") => match v {
+                F::Color(c) => p.color_start = c,
+                _ => return bad(),
+            },
+            (Component::ParticleEmitter(p), "color_end") => match v {
+                F::Color(c) => p.color_end = c,
+                _ => return bad(),
+            },
+            (Component::ParticleEmitter(p), "texture") => match v {
+                F::Text(t) => {
+                    let t = t.trim().to_string();
+                    p.texture = if t.is_empty() { None } else { Some(t) };
+                }
+                _ => return bad(),
+            },
             (_, _) => return Err(format!("{} has no property '{}'", type_name, name)),
         }
         Ok(())
@@ -962,6 +1063,25 @@ impl Component {
                 .with("looping", a.looping)
                 .with("speed", a.speed)
                 .with("crossfade", a.crossfade),
+            Component::ParticleEmitter(p) => {
+                let mut j = base
+                    .with("playing", p.playing)
+                    .with("rate", p.rate)
+                    .with("max_particles", p.max_particles as u64)
+                    .with("lifetime", p.lifetime)
+                    .with("lifetime_random", p.lifetime_random)
+                    .with("speed", p.speed)
+                    .with("spread", p.spread)
+                    .with("gravity", p.gravity.to_array())
+                    .with("size_start", p.size_start)
+                    .with("size_end", p.size_end)
+                    .with("color_start", p.color_start.to_hex())
+                    .with("color_end", p.color_end.to_hex());
+                if let Some(t) = &p.texture {
+                    j = j.with("texture", t.as_str());
+                }
+                j
+            }
         }
     }
 
@@ -1202,6 +1322,47 @@ impl Component {
                 }
                 if let Some(v) = f32_of("crossfade")? {
                     a.crossfade = v.max(0.0);
+                }
+            }
+            Component::ParticleEmitter(p) => {
+                if let Some(v) = bool_of("playing")? {
+                    p.playing = v;
+                }
+                if let Some(v) = f32_of("rate")? {
+                    p.rate = v.clamp(0.0, 1000.0);
+                }
+                if let Some(v) = f32_of("max_particles")? {
+                    p.max_particles = v.clamp(0.0, 4096.0) as u32;
+                }
+                if let Some(v) = f32_of("lifetime")? {
+                    p.lifetime = v.clamp(0.01, 60.0);
+                }
+                if let Some(v) = f32_of("lifetime_random")? {
+                    p.lifetime_random = v.clamp(0.0, 1.0);
+                }
+                if let Some(v) = f32_of("speed")? {
+                    p.speed = v.clamp(0.0, 100.0);
+                }
+                if let Some(v) = f32_of("spread")? {
+                    p.spread = v.clamp(0.0, 180.0);
+                }
+                if let Some(v) = vec_of("gravity")? {
+                    p.gravity = v;
+                }
+                if let Some(v) = f32_of("size_start")? {
+                    p.size_start = v.max(0.0);
+                }
+                if let Some(v) = f32_of("size_end")? {
+                    p.size_end = v.max(0.0);
+                }
+                if let Some(v) = color_of("color_start")? {
+                    p.color_start = v;
+                }
+                if let Some(v) = color_of("color_end")? {
+                    p.color_end = v;
+                }
+                if let Some(v) = str_of("texture")? {
+                    p.texture = if v.trim().is_empty() { None } else { Some(v) };
                 }
             }
         }

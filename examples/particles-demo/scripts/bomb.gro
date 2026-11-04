@@ -1,0 +1,11 @@
+# Press E (or B on a pad) to set off the explosion: a burst of particles
+# from this entity's ParticleEmitter. The HUD shows how many are alive.
+class Bomb < Entity
+  function update(delta)
+    emitter = self.get_component("ParticleEmitter")
+    if Input.just_pressed("explode")
+      emitter.emit_burst(120)
+    end
+    UI.text("Explosion particles alive: #{emitter.count()}  (E or B to fire)")
+  end
+end

@@ -5,6 +5,7 @@ use crate::raster::{self, DirLight, DrawItem, Lighting, LightingMode, LocalLight
 use crate::texture::Texture;
 use grodot_core::math::{Color, Mat4, Quat, Vec3};
 use grodot_core::mesh::Mesh;
+use grodot_core::particles::ParticleSprite;
 use grodot_core::scene::{Component, EntityId, LightKind, Material, Scene, Shape};
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -26,6 +27,8 @@ type SpritePick = (i32, usize, EntityId, Vec<(f32, f32)>);
 pub struct RenderExtras<'a> {
     /// Animated node-local matrices of each entity's glTF model.
     pub poses: Option<&'a HashMap<EntityId, Vec<Mat4>>>,
+    /// Live particles, drawn as camera-facing quads (see grodot_runtime::particles::sprites).
+    pub sprites: &'a [ParticleSprite],
 }
 
 #[derive(Debug, Clone, Default)]
@@ -459,6 +462,7 @@ impl SceneRenderer {
                 meshes.push((mesh, world, mat, mr.cast_shadows));
             }
         }
+        let quad = Mesh::quad_xy();
         let mut items: Vec<DrawItem> = meshes
             .iter()
             .map(|(m, model, mat, cast)| DrawItem {
@@ -469,6 +473,29 @@ impl SceneRenderer {
             })
             .collect();
         self.render_shadow_maps(&mut light, view, &items);
+        // Particles: camera-facing quads. They are blended, so the rasterizer
+        // sorts them back to front with the other transparent geometry.
+        let v = &view.view;
+        let right = Vec3 { x: v.c[0][0], y: v.c[1][0], z: v.c[2][0] };
+        let up = Vec3 { x: v.c[0][1], y: v.c[1][1], z: v.c[2][1] };
+        for sp in extras.sprites {
+            let mut material =
+                RMaterial::solid(Color { r: sp.color[0], g: sp.color[1], b: sp.color[2], a: sp.color[3] }, false);
+            material.texture = sp.texture.as_deref().and_then(|t| self.texture(t));
+            material.alpha_mode = grodot_core::scene::AlphaMode::Blend;
+            material.wrap = grodot_core::scene::TextureWrap::Clamp;
+            material.double_sided = true;
+            let s = sp.size;
+            let model = Mat4 {
+                c: [
+                    [right.x * s, right.y * s, right.z * s, 0.0],
+                    [up.x * s, up.y * s, up.z * s, 0.0],
+                    [0.0, 0.0, 1.0, 0.0],
+                    [sp.pos.x, sp.pos.y, sp.pos.z, 1.0],
+                ],
+            };
+            items.push(DrawItem { mesh: &quad, model, material, cast_shadows: false });
+        }
         raster::draw_meshes(canvas, viewport, view, &light, &items);
         items.clear();
         for (mesh, w, m) in &line_parts {

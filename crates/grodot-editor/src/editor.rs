@@ -801,7 +801,8 @@ impl Editor {
             let w = rt.world.borrow();
             let view = SceneRenderer::camera_view(&w.scene, vp).unwrap_or_else(|| self.camera.view(vp));
             let opts = RenderOptions { show_colliders: self.show_colliders, ..Default::default() };
-            let extras = grodot_render::scene_render::RenderExtras { poses: Some(&w.poses) };
+            let sprites = grodot_runtime::particles::sprites(&w);
+            let extras = grodot_render::scene_render::RenderExtras { poses: Some(&w.poses), sprites: &sprites };
             self.renderer.render_ex(&mut self.ui.canvas, vp, &w.scene, &view, &opts, &extras);
             hud::draw_debug_lines(&mut self.ui.canvas, vp, &view, &w);
             hud::draw_hud(&mut self.ui.canvas, vp, &w);
@@ -1242,6 +1243,7 @@ impl Editor {
                         let pick = matches!(
                             (cname.as_str(), fname),
                             ("MeshRenderer", "mesh" | "texture" | "emissive_texture")
+                                | ("ParticleEmitter", "texture")
                                 | ("AudioSource", "clip")
                                 | ("Script", "path")
                                 | ("AnimationPlayer", "clip")
@@ -1388,7 +1390,7 @@ fn asset_options(assets: &[String], comp: &str, field: &str) -> Vec<String> {
                 opts.extend(assets.iter().filter(|a| a.to_lowercase().ends_with(".wav")).cloned())
             }
             ("Script", "path") => opts.extend(assets.iter().filter(|a| a.ends_with(".gro")).cloned()),
-            ("MeshRenderer", "texture" | "emissive_texture") => {
+            ("MeshRenderer", "texture" | "emissive_texture") | ("ParticleEmitter", "texture") => {
                 opts.push(NO_TEXTURE.to_string());
                 opts.extend(assets.iter().filter(|a| grodot_render::scene_render::is_texture_path(a)).cloned());
             }

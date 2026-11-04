@@ -260,6 +260,7 @@ impl Runtime {
         }
         self.run_timers();
         self.advance_animations(dt);
+        crate::particles::advance_all(&mut self.world.borrow_mut(), dt);
         self.dispatch_signals();
         self.process_destroys();
         self.process_scene_load();
@@ -437,6 +438,8 @@ impl Runtime {
             w.pending_destroy.clear();
             w.animations.clear();
             w.poses.clear();
+            w.emitters.clear();
+            w.particle_bursts.clear();
         }
         self.timers.borrow_mut().list.clear();
         self.accumulator = 0.0;

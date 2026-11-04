@@ -15,7 +15,8 @@ pub fn render_game(canvas: &mut Canvas, renderer: &mut SceneRenderer, rt: &Runti
     let w = rt.world.borrow();
     match SceneRenderer::camera_view(&w.scene, area) {
         Some(view) => {
-            let extras = grodot_render::scene_render::RenderExtras { poses: Some(&w.poses) };
+            let sprites = grodot_runtime::particles::sprites(&w);
+            let extras = grodot_render::scene_render::RenderExtras { poses: Some(&w.poses), sprites: &sprites };
             renderer.render_ex(canvas, area, &w.scene, &view, &RenderOptions::default(), &extras);
             hud::draw_debug_lines(canvas, area, &view, &w);
         }
