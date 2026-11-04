@@ -445,12 +445,7 @@ impl Parser {
         loop {
             match self.peek().clone() {
                 Tok::End => break,
-                Tok::Eof => {
-                    return Err(syntax(
-                        format!("missing 'end' for 'enum' opened at line {}", span.line),
-                        span,
-                    ))
-                }
+                Tok::Eof => return Err(syntax(format!("missing 'end' for 'enum' opened at line {}", span.line), span)),
                 Tok::Const(m) => {
                     let msp = self.advance().span;
                     if members.iter().any(|(n, _)| **n == *m) {

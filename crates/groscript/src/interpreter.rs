@@ -419,7 +419,12 @@ impl Interpreter {
                             other => {
                                 return rt(
                                     ErrorKind::Type,
-                                    format!("enum value for {}.{} must be a Number, got {}", name, m, other.type_name()),
+                                    format!(
+                                        "enum value for {}.{} must be a Number, got {}",
+                                        name,
+                                        m,
+                                        other.type_name()
+                                    ),
                                 )
                             }
                         },
